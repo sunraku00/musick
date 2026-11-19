@@ -1,0 +1,57 @@
+import path from 'path';
+import { build } from 'vite';
+
+async function buildAll() {
+  console.log('--- Membangun Renderer (UI React) ---');
+  await build({
+    base: './',
+    build: {
+      outDir: 'dist/renderer',
+      emptyOutDir: true,
+    },
+  });
+
+  console.log('--- Membangun Preload Script ---');
+  await build({
+    configFile: false,
+    build: {
+      target: 'node20',
+      emptyOutDir: true,
+      outDir: 'dist/preload',
+      lib: {
+        entry: path.resolve('src/preload/index.ts'),
+        formats: ['cjs'],
+        fileName: () => 'index.cjs',
+      },
+      rollupOptions: {
+        external: ['electron'],
+      },
+    },
+  });
+
+  console.log('--- Membangun Main Process (Electron) ---');
+  await build({
+    configFile: false,
+    build: {
+      target: 'node20',
+      emptyOutDir: true,
+      outDir: 'dist/main',
+      ssr: true,
+      lib: {
+        entry: path.resolve('src/main/index.ts'),
+        formats: ['es'],
+        fileName: () => 'index.js',
+      },
+      rollupOptions: {
+        external: ['electron', 'path', 'url', 'fs', 'http', 'https', 'child_process'],
+      },
+    },
+  });
+
+  console.log('✓ Seluruh proses build selesai!');
+}
+
+buildAll().catch((err) => {
+  console.error('Build gagal:', err);
+  process.exit(1);
+});

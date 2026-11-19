@@ -1,0 +1,55 @@
+{
+  "name": "musiiiicccck",
+  "private": true,
+  "version": "0.1.0",
+  "main": "dist/main/index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "node scripts/build.mjs",
+    "start": "electron .",
+    "package": "node scripts/build.mjs && electron-builder --win nsis",
+    "test": "vitest run",
+    "test:contract": "vitest run tests/contract",
+    "test:unit": "vitest run tests/unit",
+    "test:live": "vitest run tests/live",
+    "lint": "oxlint",
+    "preview": "vite preview"
+  },
+  "build": {
+    "appId": "com.musick.desktop",
+    "productName": "Musick",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "bridge/**/*"
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false,
+      "deleteAppDataOnUninstall": false
+    }
+  },
+  "dependencies": {
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "electron": "^45.4.1",
+    "electron-builder": "^26.18.0",
+    "oxlint": "^1.90.0",
+    "typescript": "~7.0.2",
+    "vite": "^8.3.6",
+    "vitest": "^5.1.1"
+  }
+}

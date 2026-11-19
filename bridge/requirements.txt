@@ -1,0 +1,9 @@
+# Dependensi terkunci untuk Bridge Python Musick (ytmusicapi + yt-dlp)
+# Tanpa telemetri, tanpa analitik, tanpa cookie browser
+certifi==2026.10.23
+charset-normalizer==3.5.2
+idna==3.20
+requests==2.34.2
+urllib3==2.8.0
+yt-dlp==2026.10.26
+ytmusicapi==1.12.4
