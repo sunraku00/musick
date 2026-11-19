@@ -46,6 +46,9 @@ function createWindow(): void {
 }
 
 // Single-instance lock sesuai PRD Bagian 11
+app.setName('Musick');
+app.setPath('userData', path.join(app.getPath('appData'), 'Musick'));
+
 const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
   app.quit();
@@ -58,8 +61,8 @@ if (!gotTheLock) {
   });
 
   app.whenReady().then(() => {
-    // Mulai bridge anak stdio saat aplikasi dibuka
-    bridgeManager.start();
+    // Bridge Python sekarang dimuat secara "malas" (lazy):
+    // TIDAK dimulai saat app terbuka, melainkan saat permintaan pertama tiba.
     createWindow();
   });
 

@@ -26,6 +26,9 @@ def get_yt():
 def get_ydl():
     global ydl_resolver
     if ydl_resolver is None:
+        import os
+        import shutil
+
         ydl_opts = {
             'format': 'bestaudio/best',
             'quiet': True,
@@ -35,6 +38,14 @@ def get_ydl():
             # Tidak menggunakan cookie browser atau kredensial akun
             'no_cookies': True,
         }
+
+        # Konfigurasi runtime JavaScript untuk ekstraksi YouTube (n-sig challenge solver).
+        # Jika komputer target tidak menginstal Node.js/Deno, gunakan binary Electron bawaan
+        # yang bertindak sebagai runtime Node.js mandiri via ELECTRON_RUN_AS_NODE=1.
+        node_exe = os.environ.get('NODE_PATH') or shutil.which('node')
+        if node_exe and os.path.exists(node_exe):
+            ydl_opts['js_runtimes'] = {'node': {'path': node_exe}}
+
         ydl_resolver = yt_dlp.YoutubeDL(ydl_opts)
     return ydl_resolver
 
