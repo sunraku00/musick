@@ -2,6 +2,8 @@
   "name": "musiiiicccck",
   "private": true,
   "version": "0.1.0",
+  "description": "Aplikasi Pemutar Musik Windows Ringan dan Mandiri",
+  "author": "Musick Team",
   "main": "dist/main/index.js",
   "type": "module",
   "scripts": {
@@ -24,10 +26,27 @@
     },
     "files": [
       "dist/**/*",
-      "bridge/**/*"
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "python-3.12.8-embed",
+        "to": "python-3.12.8-embed",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "bridge",
+        "to": "bridge",
+        "filter": ["**/*"]
+      }
     ],
     "win": {
-      "target": "nsis"
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ]
     },
     "nsis": {
       "oneClick": false,

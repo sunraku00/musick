@@ -45,6 +45,7 @@ export class BridgeManager {
 
   private resolveScriptPath(): string {
     const candidates = [
+      path.resolve(process.resourcesPath || '', 'bridge/bridge_rpc.py'),
       path.resolve(process.cwd(), 'bridge/bridge_rpc.py'),
       path.resolve(__dirname, '../../bridge/bridge_rpc.py'),
       path.resolve(__dirname, '../bridge/bridge_rpc.py'),
@@ -60,6 +61,8 @@ export class BridgeManager {
       return process.env.PYTHON_PATH;
     }
     const candidates = [
+      path.resolve(process.resourcesPath || '', 'python-3.12.8-embed/python.exe'),
+      path.resolve(process.resourcesPath || '', 'python/python.exe'),
       path.resolve(process.cwd(), 'python-3.12.8-embed/python.exe'),
       path.resolve(process.cwd(), 'python/python.exe'),
       path.resolve(__dirname, '../../python-3.12.8-embed/python.exe'),
