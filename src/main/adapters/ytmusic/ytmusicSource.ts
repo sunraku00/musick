@@ -84,8 +84,9 @@ export class YtMusicSource implements MusicSource {
       throw new MusicSourceError('UNAVAILABLE', 'ID lagu kosong');
     }
 
+    const cleanId = sourceId.startsWith('ytmusic:') ? sourceId.slice('ytmusic:'.length) : sourceId;
     const now = Date.now();
-    const cached = this.streamCache.get(sourceId);
+    const cached = this.streamCache.get(sourceId) || this.streamCache.get(cleanId);
 
     // Jika URL stream di cache masih valid minimal 60 detik lagi, gunakan cache
     if (cached && cached.expiresAt && cached.expiresAt > now + 60000) {
@@ -93,12 +94,13 @@ export class YtMusicSource implements MusicSource {
     }
 
     await this.throttle();
-    const streamInfo = await this.bridge.resolveStream(sourceId);
+    const streamInfo = await this.bridge.resolveStream(cleanId);
     if (!streamInfo || !streamInfo.url) {
       throw new MusicSourceError('UNAVAILABLE', 'Alamat stream audio tidak ditemukan');
     }
 
     this.streamCache.set(sourceId, streamInfo);
+    this.streamCache.set(cleanId, streamInfo);
     return streamInfo;
   }
 

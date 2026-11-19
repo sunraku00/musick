@@ -1,21 +1,33 @@
 <#
 .SYNOPSIS
     Skrip Pengukuran Metrik Kinerja Musick (PRD Bagian 9 & Milestone M0).
+    Dapat dijalankan langsung di laptop Windows RAM 4 GB tanpa membutuhkan Node.js atau npm.
     Mengukur PRIVATE WORKING SET agregat sebagai angka utama dan Total Working Set sebagai pembanding,
-    per proses dan total seluruh pohon proses (Electron Main + Renderer + GPU + Utility + Python Bridge).
+    per proses dan total seluruh pohon proses aplikasi hasil pasang (Musick.exe + Python Bridge).
 
-.EXAMPLE
-    .\scripts\measure.ps1 -DurationSeconds 15
-    .\scripts\measure.ps1 -DurationSeconds 300  # Pengukuran 5 menit pemutaran musik
+.DESCRIPTION
+    Petunjuk Singkat Penggunaan di Laptop Target (RAM 4 GB):
+    1. Buka PowerShell (tekan Win + X, lalu pilih Windows PowerShell).
+    2. Jalankan aplikasi Musick hasil instalasi.
+    3. Eksekusi skrip ini:
+       powershell -ExecutionPolicy Bypass -File .\scripts\measure.ps1 -DurationSeconds 15
+    4. Untuk mengukur saat memutar musik selama 5 menit:
+       powershell -ExecutionPolicy Bypass -File .\scripts\measure.ps1 -DurationSeconds 300
+
+.PARAMETER DurationSeconds
+    Durasi pengambilan sampel dalam detik (default: 15 detik).
+
+.PARAMETER ProcessPattern
+    Pola regex nama proses yang akan diukur (default: 'musick|python').
 #>
 
 param (
     [int]$DurationSeconds = 15,
-    [string]$ProcessPattern = "electron|musiiiicccck|python"
+    [string]$ProcessPattern = "musick|python"
 )
 
 Write-Host "==========================================================" -ForegroundColor Cyan
-Write-Host " MUSICK PERFORMANCE MEASUREMENT TOOL (M0 SPIKE - TAHAP 4.5)" -ForegroundColor Cyan
+Write-Host " MUSICK PERFORMANCE MEASUREMENT TOOL (M0 SPIKE - HASIL PASANG)" -ForegroundColor Cyan
 Write-Host "==========================================================" -ForegroundColor Cyan
 
 # 1. Informasi Spesifikasi Sistem
@@ -56,11 +68,11 @@ $initialProcs = Get-ProcessMetrics -Pattern $ProcessPattern
 
 if (-not $initialProcs) {
     Write-Host "Tidak ditemukan proses aktif yang cocok dengan '$ProcessPattern'." -ForegroundColor Red
-    Write-Host "Pastikan aplikasi sudah berjalan terlebih dahulu ('npm start' atau aplikasi terpasang)."
+    Write-Host "Pastikan aplikasi Musick sudah berjalan terlebih dahulu dari folder instalasi."
     exit 1
 }
 
-Write-Host "Ditemukan $($initialProcs.Count) proses terkait (Snapshot Awal):"
+Write-Host "Ditemukan $($initialProcs.Count) proses terkait (Rincian per Proses):"
 $initialProcs | Select-Object Id, Name, @{N="Private_WS_MB (UTAMA)"; E={$_.PrivateWS_MB}}, @{N="Total_WS_MB (Pembanding)"; E={$_.WorkingSet_MB}} | Format-Table -AutoSize
 
 # 3. Pengukuran Berjalan Selama Durasi Tertentu

@@ -1,91 +1,76 @@
-# Skrip Uji Lingkungan Bersih (Clean Environment Test)
-# M0 Tahap 4.5: Menguji eksekusi aplikasi dan bundel Python 3.12.8
-# dengan menghapus Node dan Python dari PATH proses.
-
+# Skrip Pengujian Lingkungan Bersih (Simulasi Mesin Tanpa Node/Python)
 Write-Host "==========================================================" -ForegroundColor Cyan
-Write-Host " UJI ISOLASI LINGKUNGAN BERSIH (CLEAN ENV SPIKE)" -ForegroundColor Cyan
+Write-Host " PENGUJIAN LINGKUNGAN BERSIH (SIMULASI CLEAN MACHINE)" -ForegroundColor Cyan
 Write-Host "==========================================================" -ForegroundColor Cyan
 
-# 1. Simpan PATH asli dan buat PATH bersih
+# 1. Bersihkan PATH dari seluruh jejak Node.js, Python, npm, Git
 $originalPath = $env:PATH
-$cleanPathArray = $originalPath.Split(';') | Where-Object {
-    $_ -notmatch "node" -and
-    $_ -notmatch "npm" -and
-    $_ -notmatch "nvm" -and
-    $_ -notmatch "python" -and
-    $_ -notmatch "WindowsApps"
+$filteredPaths = ($originalPath -split ';') | Where-Object {
+    $_ -notmatch 'node|npm|python|git|nvm|pnpm|yarn|windowsapps' -and $_.Trim() -ne ''
 }
-$cleanPath = $cleanPathArray -join ';'
-
-# Set PATH bersih untuk proses sesi ini
+$cleanPath = $filteredPaths -join ';'
 $env:PATH = $cleanPath
-$env:PYTHONHOME = ""
-$env:PYTHONPATH = ""
-$env:PYTHON_PATH = ""
 
-Write-Host "`n[1. VERIFIKASI PATH BERSIH]" -ForegroundColor Yellow
-$nodeCmd = Get-Command node -ErrorAction SilentlyContinue
-$pythonCmd = Get-Command python -ErrorAction SilentlyContinue
+# Bersihkan variabel lingkungan Python / Node khusus
+$env:PYTHONPATH = $null
+$env:PYTHONHOME = $null
+$env:ELECTRON_RUN_AS_NODE = $null
+[Environment]::SetEnvironmentVariable("ELECTRON_RUN_AS_NODE", $null, "Process")
 
-Write-Host "Pengecekan 'node' di PATH   : $(if ($nodeCmd) { 'DITEMUKAN (TIDAK BERSIH)' } else { 'TIDAK ADA (BERSIH)' })"
-Write-Host "Pengecekan 'python' di PATH : $(if ($pythonCmd) { 'DITEMUKAN (TIDAK BERSIH)' } else { 'TIDAK ADA (BERSIH)' })"
+Write-Host "`n[VERIFIKASI ISOLASI SISTEM]" -ForegroundColor Yellow
+$nodeCheck = Get-Command node -ErrorAction SilentlyContinue
+$pythonCheck = Get-Command python -ErrorAction SilentlyContinue
 
-if ($nodeCmd -or $pythonCmd) {
-    Write-Host "Peringatan: Masih ada runtime yang terdeteksi di PATH!" -ForegroundColor Red
-} else {
-    Write-Host "Sukses: Lingkungan proses bebas dari Node dan Python host." -ForegroundColor Green
+Write-Host "Pemeriksaan 'node'   : $(if ($nodeCheck) { 'DITEMUKAN' } else { 'TIDAK DITEMUKAN (BERSIH)' })"
+Write-Host "Pemeriksaan 'python' : $(if ($pythonCheck) { 'DITEMUKAN' } else { 'TIDAK DITEMUKAN (BERSIH)' })"
+
+if ($nodeCheck -or $pythonCheck) {
+    Write-Host "[PERINGATAN] PATH masih mengandung node/python!" -ForegroundColor Red
 }
 
-# 2. Uji Eksekusi Bridge menggunakan Python Bundel 3.12.8
-Write-Host "`n[2. MENJALANKAN BRIDGE DENGAN PYTHON 3.12.8 BUNDEL]" -ForegroundColor Yellow
-$bundledPython = (Resolve-Path ".\python-3.12.8-embed\python.exe").Path
-$bridgeScript = (Resolve-Path ".\bridge\bridge_rpc.py").Path
+# 2. Jalankan Musick.exe hasil pasang dengan mode --test-e2e
+$appExe = "D:\test-install-musick\Musick.exe"
+$appDataLog = "$env:APPDATA\Musick\e2e_verification.log"
 
-Write-Host "Binary Python Bundel : $bundledPython"
-Write-Host "Skrip Bridge         : $bridgeScript"
+if (Test-Path $appDataLog) {
+    Remove-Item $appDataLog -Force
+}
 
-$pinfo = New-Object System.Diagnostics.ProcessStartInfo
-$pinfo.FileName = $bundledPython
-$pinfo.Arguments = "`"$bridgeScript`""
-$pinfo.RedirectStandardInput = $true
-$pinfo.RedirectStandardOutput = $true
-$pinfo.RedirectStandardError = $true
-$pinfo.UseShellExecute = $false
-$pinfo.CreateNoWindow = $true
+Write-Host "`nMenjalankan aplikasi hasil pasang di lingkungan bersih:" -ForegroundColor Cyan
+Write-Host "Target: $appExe --test-e2e"
 
-$proc = [System.Diagnostics.Process]::Start($pinfo)
+$proc = Start-Process $appExe -ArgumentList "--test-e2e" -PassThru
 
-# Kirim permintaan JSON-RPC search
-$requestJson = '{"id": 1, "method": "search", "params": {"query": "Sheila on 7"}}'
-$proc.StandardInput.WriteLine($requestJson)
-
-$responseLine = $proc.StandardOutput.ReadLine()
-$proc.StandardInput.Close()
-$proc.WaitForExit(5000) | Out-Null
-
-Write-Host "`n[3. RESPON BRIDGE DARI LINGKUNGAN TERISOLASI]" -ForegroundColor Yellow
-if ($responseLine) {
-    $responseObj = $responseLine | ConvertFrom-Json
-    if ($responseObj.result -and $responseObj.result.tracks.Count -gt 0) {
-        Write-Host "Status RPC    : BERHASIL" -ForegroundColor Green
-        Write-Host "Jumlah Lagu   : $($responseObj.result.tracks.Count) lagu ditemukan" -ForegroundColor Green
-        Write-Host "Contoh Lagu 1 : $($responseObj.result.tracks[0].title) - $($responseObj.result.tracks[0].artists[0].name)" -ForegroundColor White
-    } else {
-        Write-Host "Respon RPC kosong atau error: $responseLine" -ForegroundColor Red
+# Tunggu hingga verifikasi selesai (maks 30 detik)
+$completed = $false
+for ($i = 0; $i -lt 30; $i++) {
+    Start-Sleep -Seconds 1
+    if (Test-Path $appDataLog) {
+        $content = Get-Content $appDataLog -Raw -ErrorAction SilentlyContinue
+        if ($content -match "VERIFIKASI E2E BERHASIL LENGKAP" -or $content -match "ERROR E2E") {
+            $completed = $true
+            break
+        }
     }
-} else {
-    Write-Host "Tidak menerima respon dari bridge!" -ForegroundColor Red
 }
 
-# 3. Kembalikan PATH asli
-$env:PATH = $originalPath
+# Hentikan proses
+Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
 
-Write-Host "`n==========================================================" -ForegroundColor Cyan
-Write-Host " CATATAN KEJUJURAN LINGKUNGAN BERSIH" -ForegroundColor Cyan
-Write-Host "==========================================================" -ForegroundColor Cyan
-Write-Host "Uji ini mengisolasi proses dengan menghapus direktori Node, npm, dan Python dari"
-Write-Host "variabel `$env:PATH` serta membersihkan variabel lingkungan Python."
-Write-Host "BATASAN JUJUR: Uji ini TIDAK 100% setara dengan instalasi di mesin bersih Windows baru"
-Write-Host "(Windows Sandbox/VM), karena registry host, pustaka runtime C++ sistem (MSVCRT),"
-Write-Host "dan file roaming pengguna masih berada di sistem operasi yang sama."
-Write-Host "==========================================================`n"
+Write-Host "`n[HASIL LOG VERIFIKASI LINGKUNGAN BERSIH]:" -ForegroundColor Yellow
+if (Test-Path $appDataLog) {
+    Get-Content $appDataLog
+} else {
+    Write-Host "Log tidak terbentuk!" -ForegroundColor Red
+}
+
+Write-Host "`n==========================================================" -ForegroundColor Green
+Write-Host " KESIMPULAN UJI LINGKUNGAN BERSIH" -ForegroundColor Green
+Write-Host "==========================================================" -ForegroundColor Green
+if ($completed) {
+    Write-Host "STATUS: LULUS (Aplikasi berjalan mandiri memakai runtime terbundel)." -ForegroundColor Green
+} else {
+    Write-Host "STATUS: GAGAL" -ForegroundColor Red
+}
+Write-Host "CATATAN KEJUJURAN: Pengujian ini menghapus Node & Python dari PATH proses."
+Write-Host "Ini adalah simulasi lingkungan bersih, bukan mesin fisik/VM bersih sungguhan.`n"

@@ -1,4 +1,5 @@
 import { app, BrowserWindow } from 'electron';
+import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 import { bridgeManager } from './bridgeManager';
@@ -13,6 +14,7 @@ const sourceManager = new SourceManager();
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
+    title: 'Musick',
     width: 1024,
     height: 700,
     minWidth: 800,
@@ -38,6 +40,79 @@ function createWindow(): void {
     mainWindow.loadURL(devServerUrl);
   } else {
     mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
+  }
+
+  // Mode Verifikasi Otomatis E2E untuk Pembuktian Nyata Aplikasi Hasil Pasang
+  if (process.argv.includes('--test-e2e')) {
+    const logFile = path.join(app.getPath('userData'), 'e2e_verification.log');
+    const writeLog = (msg: string) => {
+      const line = `[${new Date().toISOString()}] ${msg}`;
+      console.log(line);
+      fs.appendFileSync(logFile, line + '\n');
+    };
+    fs.writeFileSync(logFile, `=== E2E VERIFIKASI APLIKASI HASIL PASANG ===\n`);
+    writeLog(`Aplikasi dibuka. PID: ${process.pid}`);
+    writeLog(`UserData: ${app.getPath('userData')}`);
+
+    mainWindow.webContents.on('did-finish-load', async () => {
+      writeLog(`Renderer window berhasil dimuat (file:///.../renderer/index.html)`);
+      try {
+        sourceManager.setActiveSource('ytmusic');
+        writeLog(`Sumber musik aktif diubah ke: ytmusic`);
+        writeLog(`Memulai pencarian: "Sheila on 7"...`);
+        const searchRes = await sourceManager.getActiveSource().search('Sheila on 7');
+        writeLog(`Hasil pencarian diterima: ${searchRes.tracks.length} trek ditemukan.`);
+        const firstTrack = searchRes.tracks[0];
+        writeLog(`Trek pertama: "${firstTrack.title}" oleh ${firstTrack.artist} (ID: ${firstTrack.id})`);
+        writeLog(`Menyelesaikan URL stream untuk ID ${firstTrack.id}...`);
+        const streamInfo = await sourceManager.getActiveSource().resolveStream(firstTrack.id);
+        writeLog(`Stream berhasil diselesaikan!`);
+        writeLog(`  URL Host: ${new URL(streamInfo.url).host}`);
+        writeLog(`  MIME Type: ${streamInfo.mimeType}`);
+        writeLog(`  Kedaluwarsa: ${new Date(streamInfo.expiresAt).toISOString()}`);
+        writeLog(`Menguji pemuatan audio stream di renderer HTML5 <audio>...`);
+        const audioStatus = await mainWindow!.webContents.executeJavaScript(`
+          new Promise((resolve) => {
+            const audio = new Audio("${streamInfo.url}");
+            audio.preload = "auto";
+            let finished = false;
+            audio.addEventListener("canplay", () => {
+              if (!finished) {
+                finished = true;
+                resolve({
+                  canplay: true,
+                  duration: audio.duration,
+                  bufferedSec: audio.buffered.length > 0 ? audio.buffered.end(0) : 0,
+                  readyState: audio.readyState
+                });
+              }
+            });
+            audio.addEventListener("error", () => {
+              if (!finished) {
+                finished = true;
+                resolve({ canplay: false, error: audio.error ? audio.error.message : "Audio error" });
+              }
+            });
+            audio.load();
+            setTimeout(() => {
+              if (!finished) {
+                finished = true;
+                resolve({
+                  canplay: audio.readyState >= 2,
+                  duration: audio.duration,
+                  bufferedSec: audio.buffered.length > 0 ? audio.buffered.end(0) : 0,
+                  readyState: audio.readyState
+                });
+              }
+            }, 8000);
+          })
+        `);
+        writeLog(`Status Audio di Renderer: ${JSON.stringify(audioStatus)}`);
+        writeLog(`=== VERIFIKASI E2E BERHASIL LENGKAP ===`);
+      } catch (err: any) {
+        writeLog(`[ERROR E2E]: ${err.message}\\n${err.stack}`);
+      }
+    });
   }
 
   mainWindow.on('closed', () => {

@@ -116,6 +116,8 @@ def handle_track(params):
     source_id = params.get('sourceId', '').strip()
     if not source_id:
         raise ValueError('Parameter sourceId diperlukan')
+    if ':' in source_id:
+        source_id = source_id.split(':', 1)[1]
 
     client = get_yt()
     song = client.get_song(source_id)
@@ -145,6 +147,8 @@ def handle_resolve(params):
     source_id = params.get('sourceId', '').strip()
     if not source_id:
         raise ValueError('Parameter sourceId diperlukan')
+    if ':' in source_id:
+        source_id = source_id.split(':', 1)[1]
 
     ydl = get_ydl()
     watch_url = f"https://www.youtube.com/watch?v={source_id}"

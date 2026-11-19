@@ -2,8 +2,12 @@ import { spawn, execSync, type ChildProcess } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as readline from 'readline';
+import { fileURLToPath } from 'url';
 import { MusicSourceError } from '../shared/errors';
 import type { SearchResult, StreamInfo, Track } from '../shared/types';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 interface PendingRequest {
   resolve: (value: any) => void;
