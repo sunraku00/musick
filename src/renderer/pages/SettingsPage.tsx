@@ -30,29 +30,29 @@ export const SettingsPage: React.FC = () => {
             />
             <div>
               <div style={{ fontSize: '14px', fontWeight: 500, color: '#ffffff' }}>
-                {ID_STRINGS.settings.qualityEconomy}
+                Standard / Hemat (WebM Opus ~128 kbps) - Aktif
               </div>
               <div style={{ fontSize: '12px', color: '#888888', marginTop: '2px' }}>
-                {ID_STRINGS.settings.qualityEconomyDesc}
+                Kualitas terbaik yang disediakan YouTube tanpa login. Estimasi pemakaian kuota: {( (128 * 3600) / (8 * 1024) ).toFixed(1)} MB/jam.
               </div>
             </div>
           </label>
 
-          <label style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', cursor: 'pointer' }}>
+          <label style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', opacity: 0.5, cursor: 'not-allowed' }}>
             <input
               type="radio"
               name="quality"
               value="high"
-              checked={audioQuality === 'high'}
-              onChange={() => setAudioQuality('high')}
-              style={{ marginTop: '3px', accentColor: '#1db954' }}
+              disabled
+              checked={false}
+              style={{ marginTop: '3px' }}
             />
             <div>
-              <div style={{ fontSize: '14px', fontWeight: 500, color: '#ffffff' }}>
-                {ID_STRINGS.settings.qualityHigh}
+              <div style={{ fontSize: '14px', fontWeight: 500, color: '#888888' }}>
+                Tinggi (256 kbps AAC) - Tidak Tersedia
               </div>
-              <div style={{ fontSize: '12px', color: '#888888', marginTop: '2px' }}>
-                {ID_STRINGS.settings.qualityHighDesc}
+              <div style={{ fontSize: '12px', color: '#666666', marginTop: '2px' }}>
+                Format 256 kbps memerlukan akun YouTube Music Premium. Sumber gratis membatasi aliran maksimal pada ~128 kbps (itag 251 Opus).
               </div>
             </div>
           </label>

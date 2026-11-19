@@ -21,15 +21,15 @@ Aplikasi tidak menyertakan pustaka analitik, pelacakan, atau pelaporan crash oto
 1. Tanpa iklan, tanpa langganan, tanpa paywall.
 2. Tanpa akun dan tanpa server milik pembuat.
 3. Tanpa pustaka telemetri, analitik, atau pelaporan crash otomatis pihak ketiga.
-4. Ringan: nyaman di laptop spek rendah (target divalidasi bertahap).
-5. Sumber musik terisolasi dari aplikasi lewat antarmuka `MusicSource`, supaya bisa diganti tanpa menulis ulang UI atau database.
+4. Ringan: nyaman di laptop spek rendah (target divalidasi bertahap, gerbang M3).
+5. Sumber musik terisolasi dari aplikasi lewat satu antarmuka `MusicSource`, supaya bisa diganti tanpa menulis ulang UI atau database.
 
 ## 2. Tujuan dan Bukan Tujuan
 
 **Tujuan**
 - Teman-teman pembuat bisa mencari dan memutar musik tanpa iklan, dan senang memakainya.
 - Fitur inti (cari, putar, antrean, favorit, playlist) berjalan stabil.
-- Berjalan lancar di laptop RAM 4 GB (wajib divalidasi di M3).
+- Berjalan lancar di laptop RAM 4 GB (wajib divalidasi pada gerbang M3).
 
 **Bukan tujuan (saat ini)**
 - Menghasilkan uang dalam bentuk apa pun.
@@ -75,7 +75,7 @@ Ringan, tanpa iklan, dan privasi lokal adalah **syarat kualitas** untuk semua fi
 - Beranda dan rekomendasi sederhana (berdasarkan lagu yang sering diputar)
 - Lirik
 - Berbagi playlist lewat file atau kode
-- Pembaruan aplikasi mandiri berbasis komponen bertanda tangan
+- Pembaruan komponen mandiri berbasis verifikasi tanda tangan digital
 
 ### Nanti dulu
 - Unduh offline (V3, risiko hukum tertinggi, diputuskan ulang)
@@ -106,7 +106,7 @@ Ringan, tanpa iklan, dan privasi lokal adalah **syarat kualitas** untuk semua fi
 
 **Alur gagal (wajib ditangani tanpa crash)**
 - Sumber musik tidak bisa diakses → pesan "Sumber musik sedang bermasalah", pemutaran lagu yang sudah berjalan tidak terputus bila memungkinkan, tombol "Coba lagi".
-- Akses dibatasi (bot check) → pesan ramah `BLOCKED`: "Akses dibatasi oleh sumber musik (deteksi bot/jaringan). Silakan coba beberapa saat lagi."
+- Akses dibatasi (bot check) → pesan ramah kelas `BLOCKED`: "Akses dibatasi oleh sumber musik (deteksi bot/jaringan). Silakan coba beberapa saat lagi."
 - Lagu tidak tersedia → lompat ke lagu berikutnya dengan pemberitahuan kecil.
 - Internet putus → pesan jelas, data lokal (playlist, favorit) tetap bisa dilihat.
 
@@ -116,7 +116,7 @@ Ringan, tanpa iklan, dan privasi lokal adalah **syarat kualitas** untuk semua fi
 |---|---|---|
 | Pemutar (bar bawah, selalu tampil) | Sampul, judul, artis, putar/jeda/lanjut/sebelumnya, slider posisi, volume, acak, ulang, hati, tombol Antrean | V1 |
 | Sidebar kiri | Beranda, Cari, Perpustakaan, daftar playlist, "Buat playlist" | V1 |
-| Beranda | "Terakhir diputar" (keadaan kosong rapi di awal), pintasan Liked Songs. V2: rekomendasi | V1/V2 |
+| Beranda | "Terakhir diputar" (keadaan kosong rapi di awal), pintasan Liked Songs. V2: rekomendasi sederhana | V1/V2 |
 | Cari | Kolom cari, riwayat cari, hasil Lagu/Artis/Album | V1 |
 | Halaman Artis | Nama, foto, lagu populer, album | V1 |
 | Halaman Album | Sampul, judul, artis, tahun, daftar lagu, putar semua | V1 |
@@ -131,17 +131,21 @@ Ringan, tanpa iklan, dan privasi lokal adalah **syarat kualitas** untuk semua fi
 
 ### F1. Pencarian
 - Mengetik lalu berhenti 400 ms memicu pencarian (debounce). Kata kosong atau spasi saja tidak memicu pencarian.
-- Hasil dikelompokkan Lagu, Artis, Album. Tampil dalam 3 detik pada koneksi normal; bila lebih lama, tampil indikator memuat.
+- Hasil dikelompokkan Lagu, Artis, Album. Tampil dalam 3 detik pada koneksi normal; bila lebih lama, tampil indikator memuat (skeleton loader).
 - Hasil kosong menampilkan "Tidak ada hasil untuk '...'". Kegagalan sumber menampilkan pesan error berbeda dari hasil kosong.
-- Hasil pencarian yang sama dalam sesi yang sama dipakai ulang (cache) agar tidak membebani sumber.
-- Teks dari sumber ditampilkan sebagai teks biasa (tidak pernah sebagai HTML).
+- Hasil pencarian yang sama dalam sesi yang sama dipakai ulang (cache) agar tidak membebani sumber, dengan batas LRU 50 kueri dan TTL.
+- Latest-wins: respons pencarian yang datang terlambat tidak boleh menimpa kueri terbaru.
+- Tombol "Coba lagi" pada pesan error tidak menghapus teks kueri pencarian.
+- Teks dari sumber ditampilkan sebagai teks biasa murni (tidak pernah sebagai HTML / tanpa `dangerouslySetInnerHTML`).
 
 ### F2. Kontrol pemutar
 - Putar, jeda, lanjut, sebelumnya/berikutnya, geser posisi, volume dan bisukan berfungsi. Volume dan posisi terakhir tersimpan.
+- Tombol sebelumnya me-restart lagu jika sudah diputar lebih dari 3 detik; jika $\le 3$ detik, pindah ke lagu sebelumnya di antrean.
 - Menggeser ke posisi melebihi durasi diperlakukan sebagai akhir lagu.
-- Pemutaran berlanjut normal setelah komputer tidur lalu bangun, dan setelah perangkat audio berganti (misalnya headphone dicabut → jeda otomatis).
-- Tombol media keyboard (play/pause/next/prev) berfungsi.
-- Bila alamat stream kedaluwarsa di tengah lagu, aplikasi mengambil ulang alamat dan melanjutkan dari posisi terakhir tanpa tindakan pengguna. Bila gagal 2 kali berturut-turut, tampilkan pesan dan lompat ke lagu berikutnya; berhenti setelah 5 lompatan berturut-turut.
+- Pemutaran berlanjut normal setelah komputer tidur lalu bangun (status dipulihkan, stream diambil ulang, tetap dalam keadaan jeda sampai ditekan putar).
+- Penanganan perangkat audio berganti (misalnya headphone dicabut → jeda otomatis sebagai upaya terbaik).
+- Kontrol media terintegrasi melalui Media Session API (`navigator.mediaSession`), bukan globalShortcut.
+- Bila alamat stream kedaluwarsa di tengah lagu, aplikasi mengambil ulang alamat dan melanjutkan dari posisi terakhir tanpa tindakan pengguna. Bila gagal 2 kali berturut-turut, tampilkan pesan dan lompat ke lagu berikutnya; berhenti setelah 5 lompatan berturut-turut (*infinite loop guard*). Reset penghitung lompatan setelah 5 detik pemutaran sukses.
 
 ### F3. Antrean, acak, ulang
 - Mode ulang: mati, ulang semua, ulang satu lagu.
@@ -172,10 +176,10 @@ Ringan, tanpa iklan, dan privasi lokal adalah **syarat kualitas** untuk semua fi
 - File atau kode rusak menghasilkan pesan "File tidak valid", tidak pernah crash.
 
 ### F7. Distribusi dan pembaruan
-- Installer Windows (.exe) NSIS dibagikan bersama **checksum SHA-256** lewat saluran terpisah.
+- Installer Windows (.exe) NSIS dibagikan bersama **checksum SHA-256** lewat saluran terpisah dari berkas.
 - Aplikasi menampilkan nomor versi di Pengaturan > Tentang.
 - V1: pembaruan manual (data pengguna tetap aman di `%APPDATA%\Musick`, bukan di folder instalasi).
-- V2: pembaruan komponen terpisah (arsip bridge terkompresi dengan tanda tangan digital Ed25519) langsung dari host rilis resmi tanpa mengunduh ulang installer Electron.
+- V2: pemeriksaan pembaruan opsional dan terlihat; pembaruan komponen bridge mandiri (arsip zip bertanda tangan Ed25519) langsung dari host rilis resmi tanpa mengunduh ulang installer Electron utuh.
 
 ## 9. Persyaratan Nonfungsional
 
@@ -188,19 +192,19 @@ Angka target di bawah menggunakan metrik **Private Working Set (PWS)** sebagai u
 | Memori (Memutar) | ≤ 250 MB Private WS | **152,95 MB** rata-rata (puncak 190,24 MB) | Indikatif (pemutaran 5 menit) |
 | Waktu buka (Cold start) | ≤ 3 detik | **1,09 detik** rata-rata (3 sampel) | Indikatif (diukur pada rilis) |
 | CPU (Memutar) | ≤ 5% rata-rata | **0,11%** rata-rata (puncak 3,81%) | Indikatif (diukur pada rilis) |
-| Ukuran installer | ≤ 150 MB | **135,51 MB** (142.090.317 byte) | Terverifikasi (NSIS terbundel) |
+| Ukuran installer | ≤ 150 MB | **135,51 MB** (142.096.439 byte) | Terverifikasi (NSIS terbundel) |
 | Ukuran di disk | Sekitar 420 MB | **427,3 MB** (2.760 berkas) | Terverifikasi (folder hasil pasang) |
 | Validasi RAM 4 GB | Nyaman di laptop RAM 4 GB | *Menunggu pengujian langsung di M3* | **Belum divalidasi** (Gerbang M3) |
-| Data internet | Kualitas audio bisa diatur; default hemat | Formats: WebM Opus ~128 kbps / M4A ~128 kbps | Menunggu implementasi M1 |
+| Data internet | Kualitas audio bisa diatur; default hemat | Formats: WebM Opus ~128 kbps (dihitung dari bitrate format) | Menunggu implementasi M1 |
 | Stabilitas | Nol crash dalam 8 jam terus-menerus | Uji 5 menit: 0 error, orphan cleanup 100% | Diuji bertahap |
-| Bahasa | Antarmuka bahasa Indonesia, struktur i18n | Siap diimplementasikan di M1 | Target M1 |
-| Aksesibilitas | Navigasi keyboard penuh, kontras tinggi | Navigasi Tab, fokus ring jelas | Target M1 |
+| Bahasa | Antarmuka bahasa Indonesia, struktur i18n | Terpusat di `src/shared/i18n/id.ts` | Terverifikasi di M1 |
+| Aksesibilitas | Navigasi keyboard penuh, kontras tinggi | Navigasi Tab, fokus ring jelas | Target M1/M2 |
 
 ## 10. Arsitektur dan Keputusan Teknis
 
 ```
 ┌──────────────────────── Aplikasi desktop (Windows) ───────────────────────┐
-│  UI React (Renderer Process)                                               │
+│  UI React (Renderer Process, skema app://musick/)                          │
 │    │  (IPC Terisolasi & Bertipe di Preload, ContextIsolation=true)        │
 │  Main Process (Electron v45): Pemutar, Antrean, SQLite                     │
 │    │                         │                                             │
@@ -221,34 +225,96 @@ Angka target di bawah menggunakan metrik **Private Working Set (PWS)** sebagai u
 | **K1** | **Cara menjalankan ytmusicapi** | **TERPUTUSKAN** | **Python 3.12.8 embeddable bundel** dengan mekanisme *lazy spawning* stdio JSON-RPC. Tanpa socket HTTP, tanpa port terbuka, mati otomatis saat 5 menit idle, mati seketika saat main process ditutup via EOF stdin. |
 | **K2** | **Cara mendapatkan audio** | **DIJELASKAN** | **Bridge yt-dlp** di balik antarmuka `MusicSource.resolveStream`. Mengambil URL stream HTTPS langsung dari CDN googlevideo (`itag=251` Opus) dengan opsi `skip_download=True` tanpa login/cookie akun. URL dialirkan langsung ke pemutar HTML5 di renderer. |
 | **K3** | **Pembungkus desktop** | **TERPUTUSKAN** | **Electron untuk V1.** Estimasi angka Tauri (30–40 MB) dicabut karena tidak terverifikasi pada Windows (WebView2 multi-proses membutuhkan 100–120 MB RAM). Electron terbukti stabil, lulus audit keamanan sandboxing/CSP, dan menghasilkan Private Working Set 152,95 MB saat pemutaran aktif. |
-| **K4** | **Pustaka database** | **DALAM EVALUASI** | SQLite lokal. Sedang dievaluasi antara modul bawaan `node:sqlite` (Node 22+) vs `better-sqlite3`. Keputusan final ditentukan pada awal M1 berdasarkan stabilitas build Electron 45 di Windows. |
+| **K4** | **Pustaka database** | **DALAM EVALUASI** | SQLite lokal via modul bawaan **`node:sqlite`** (dibungkus antarmuka repositori tipis, mode WAL, PRAGMA foreign_keys=ON, query berparameter, integrity check). |
 | **K5** | **Lisensi aplikasi** | **TERBUKA** | Menunggu keputusan pemilik produk (open source vs tertutup). |
 | **K6** | **Sumber lirik** | **TERBUKA** | Ditunda ke V2. |
 
 ### Pedoman Keamanan Penerapan
 - `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`.
-- Fuse hardening Electron aktif: `RunAsNode=Disabled`, `OnlyLoadAppFromAsar=Enabled`, `EnableEmbeddedAsarIntegrityValidation=Enabled`, `EnableCookieEncryption=Enabled`.
-- Build rilis tidak membuka remote debugging (`--remote-debugging-port` dilarang di rilis).
-- Content Security Policy ketat. **Dilarang** `dangerouslySetInnerHTML` dan `eval`. Semua teks dari sumber dirender sebagai teks biasa.
-- Navigasi eksternal dan jendela baru diblokir.
+- Fuse hardening Electron aktif: `RunAsNode=Disabled`, `OnlyLoadAppFromAsar=Enabled`, `EnableEmbeddedAsarIntegrityValidation=Enabled`, `EnableCookieEncryption=Enabled`, `GrantFileProtocolExtraPrivileges=Disabled`.
+- Pemuatan aset renderer menggunakan protokol kustom `app://musick/` dengan penjaga keamanan anti path traversal.
+- Build rilis dipastikan menolak remote debugging (`--remote-debugging-port`).
+- Content Security Policy ketat. **Dilarang** `dangerouslySetInnerHTML` dan `eval`. Semua teks dari sumber dirender sebagai teks biasa murni.
+- Navigasi eksternal dan jendela baru diblokir total.
 - Seluruh permintaan jaringan (kecuali pengaliran audio langsung dari googlevideo CDN dan thumbnail album) berasal dari backend main process / bridge Python.
 
 ## 11. Rancangan Database (SQLite lokal)
 
-Lokasi: `%APPDATA%\Musick\musick.db`. Tidak dihapus saat aplikasi dicopot (preservasi data pengguna).
+Lokasi: folder data pengguna (`%APPDATA%\Musick\musick.db`), bukan folder instalasi, agar pembaruan tidak menghapus data.
 
 ### Relasi
+
 ```
 artists ──< track_artists >── tracks >── albums
-                                │
-    ┌───────────────────────────┼───────────────────────┐
+                               │
+   ┌───────────────────────────┼───────────────────────┐
 playlist_tracks >── playlists  liked_tracks  queue_items  play_history
 ```
 
-### Tabel Inti M1 & M2
-- **`schema_meta`**: versi migrasi skema database.
-- **`settings`**: pengaturan lokal (volume, mute, kualitas audio, repeat, shuffle).
-- *(Tabel `tracks`, `artists`, `albums`, `playlists`, `liked_tracks`, `queue_items`, `play_history` diimplementasikan pada M2)*.
+### Tabel
+
+**`schema_meta`** (untuk pelacakan migrasi)
+
+| Kolom | Tipe | Keterangan |
+|---|---|---|
+| key | TEXT PK | Mis. `schema_version` |
+| value | TEXT | Nilai konfigurasi / versi skema |
+
+Dipakai untuk migrasi terurut saat aplikasi diperbarui. Sebelum migrasi, database dicadangkan otomatis.
+
+**`tracks`**
+
+| Kolom | Tipe | Keterangan |
+|---|---|---|
+| id | INTEGER PK | Primary Key internal |
+| source | TEXT NOT NULL | Mis. `ytmusic` |
+| source_id | TEXT NOT NULL | `UNIQUE(source, source_id)` |
+| title | TEXT NOT NULL | Judul trek |
+| album_id | INTEGER FK → albums | Boleh kosong, `ON DELETE SET NULL` |
+| duration_sec | INTEGER | Durasi dalam detik |
+| cover_url | TEXT | URL gambar sampul |
+| is_available | INTEGER (0/1) | Default 1; diset 0 bila sumber melaporkan tidak tersedia |
+| last_checked_at | DATETIME | Kapan terakhir dicek ketersediaannya |
+| created_at | DATETIME | Waktu simpan |
+
+**`artists`**: `id` PK; `source`, `source_id` (`UNIQUE` bersama); `name` NOT NULL; `image_url`.
+
+**`albums`**: `id` PK; `source`, `source_id` (`UNIQUE` bersama); `title` NOT NULL; `artist_id` FK → artists; `year`; `cover_url`.
+
+**`track_artists`**: `track_id` FK, `artist_id` FK, `position`. PK gabungan `(track_id, artist_id)`. `ON DELETE CASCADE`.
+
+**`playlists`**: `id` PK; `name` NOT NULL (maks 100); `description` (maks 300); `created_at`; `updated_at`.
+
+**`playlist_tracks`**
+
+| Kolom | Tipe | Keterangan |
+|---|---|---|
+| id | INTEGER PK | Pengganti PK gabungan agar lagu yang sama boleh muncul dua kali |
+| playlist_id | INTEGER FK → playlists | `ON DELETE CASCADE` |
+| track_id | INTEGER FK → tracks | `ON DELETE RESTRICT` (lagu di playlist tidak ikut terhapus saat bersih-bersih cache) |
+| position | INTEGER NOT NULL | Urutan urutan di playlist |
+| added_at | DATETIME | Waktu ditambahkan |
+
+Indeks: `(playlist_id, position)`.
+
+**`liked_tracks`**: `track_id` PK FK → tracks; `liked_at`. Indeks pada `liked_at`.
+
+**`queue_items`**: `id` PK; `track_id` FK; `position`; `original_position`. Antrean hanya satu (aplikasi menyimpan satu antrean aktif). Indeks `position`.
+
+**`play_history`**: `id` PK; `track_id` FK; `played_at`. Dibatasi otomatis (misalnya 500 entri terakhir) agar tidak membengkak dan untuk meminimalkan data yang tersimpan.
+
+**`search_history`**: `id` PK; `query`; `searched_at`. Dibatasi 50 entri terakhir.
+
+**`settings`**: `key` PK; `value`. Contoh kunci: `volume`, `shuffle`, `repeat_mode`, `theme`, `audio_quality`, `queue_current_id`, `last_position_sec`, `update_check_enabled`.
+
+### Aturan Data
+- Hanya **metadata** yang disimpan. Tidak ada file audio yang disimpan ke disk.
+- Tombol "Hapus riwayat" menghapus `play_history` dan `search_history` secara permanen.
+- "Cadangkan data" mengekspor playlist dan favorit ke satu file; "Pulihkan" mengimpornya dengan validasi yang sama seperti impor playlist.
+- Penulisan ke database memakai transaksi (reorder playlist atau antrean tidak boleh setengah jadi).
+- Saat dibuka, aplikasi menjalankan `PRAGMA integrity_check`. Bila rusak, tawarkan memulihkan dari cadangan otomatis terakhir.
+- Aplikasi hanya boleh berjalan **satu instans** (single-instance lock) agar dua proses tidak menulis ke database yang sama secara konkuren.
+- Disk penuh atau gagal menulis: tampilkan pesan ramah, jangan crash, dan jangan merusak data yang sudah ada.
 
 ## 12. Privasi dan Keamanan
 
@@ -263,45 +329,102 @@ Namun, pengguna harus memahami batasan teknis privasi berikut:
 
 | Risiko | Dampak | Mitigasi |
 |---|---|---|
-| Installer tidak bertanda tangan memicu SmartScreen Windows | Sedang | Distribusi checksum SHA-256 lewat saluran pesan terpisah; sediakan panduan visual untuk teman |
-| Pembaruan otomatis dibajak | Tinggi | Pembaruan komponen menggunakan verifikasi kriptografi tanda tangan Ed25519 |
-| Injeksi skrip XSS di renderer UI | Tinggi | Isolasi konteks, CSP ketat, Larangan `dangerouslySetInnerHTML`, pembatasan skrip inline |
+| Installer palsu atau terselip malware (tidak ditandatangani, dibagikan lewat chat) | Tinggi | Checksum SHA-256 lewat saluran terpisah; pertimbangkan tanda tangan kode kelak; jelaskan ke teman soal peringatan SmartScreen dan cara memverifikasi |
+| Pembaruan otomatis dibajak | Tinggi | V1 tanpa pembaruan otomatis; V2 hanya HTTPS dari satu alamat, verifikasi tanda tangan digital Ed25519, bisa dimatikan |
+| Impor file/kode playlist berbahaya (XSS, file raksasa, JSON aneh) | Sedang | Validasi skema, batas ukuran dan jumlah, teks dirender sebagai teks, pratinjau + konfirmasi |
 | Injeksi SQL | Sedang | Query berparameter wajib, tanpa penggabungan string query mentah |
+| Eksekusi kode lewat UI (XSS di Electron) | Tinggi | Isolasi konteks, CSP ketat, tanpa `dangerouslySetInnerHTML`, tanpa akses Node di UI, skema `app://` terproteksi |
+| Data riwayat terbaca orang lain di komputer yang sama | Rendah–sedang | Batas jumlah riwayat, tombol hapus; database tidak dienkripsi (diterima, dicatat) |
+| Gambar sampul dari server pihak ketiga membocorkan IP | Rendah | Diakui di pernyataan privasi; opsi menyimpan sampul di cache lokal |
+| Berkas log berisi data pribadi | Rendah | Log lokal, tanpa kata pencarian default, tanpa judul lagu default, bisa dihapus |
 | Pustaka dependensi rentan | Sedang | Penguncian versi di `package.json` dan `bridge/requirements.txt`, audit berkala |
 
 ## 13. Daftar Edge Case yang Wajib Diuji
 
 **Pemutaran**
-- Alamat stream kedaluwarsa di tengah lagu (ambil ulang otomatis dan lanjutkan dari detik terakhir).
+- Alamat stream kedaluwarsa di tengah lagu (ambil ulang otomatis dan lanjutkan dari posisi detik terakhir).
 - Internet putus saat memutar, lalu tersambung lagi.
-- Komputer tidur dan bangun; perangkat audio dicabut/diganti (jeda otomatis saat headphone dicabut).
-- Deteksi anti-bot YouTube tanpa cookie (`BLOCKED`).
-- Lima lagu berturut-turut tidak tersedia (berhenti otomatis agar tidak loop tak berujung).
-- Aksi beruntun pengguna (mengklik tombol berikutnya 10 kali secara cepat) tidak merusak state audio.
+- Komputer tidur dan bangun; perangkat audio dicabut/diganti (jeda otomatis saat headphone dicabut, tetap jeda saat bangun tidur).
+- Lagu diblokir wilayah, dihapus dari sumber, atau durasi nol/tidak diketahui.
+- Lima lagu berturut-turut tidak tersedia (berhenti otomatis dengan pesan loop guard).
+- Dua tindakan cepat berurutan (klik "berikutnya" 10 kali dengan cepat) tidak merusak status pemutar.
 
-**Pencarian dan Antarmuka**
-- Input kosong, spasi berulang, atau karakter non-Latin/emoji.
-- Latensi jaringan tinggi (tampilkan skeleton loading).
-- Cache per sesi untuk query yang berulang.
+**Antrean**
+- Menghapus lagu yang sedang diputar; menghapus semua; antrean satu lagu dengan ulang semua.
+- Menyalakan lalu mematikan acak berulang kali.
+- Aplikasi ditutup paksa saat memutar, lalu dibuka lagi.
+
+**Playlist dan Data**
+- Playlist 1.000+ lagu; duplikat lagu; nama playlist kosong, panjang, atau berisi emoji.
+- Menghapus playlist yang berisi lagu yang juga difavoritkan.
+- Database rusak; disk penuh; dua instans aplikasi dibuka bersamaan.
+- Impor file kosong, rusak, terlalu besar, berisi skrip, atau dari versi format yang lebih baru.
+
+**Pencarian dan Tampilan**
+- Kata pencarian kosong, sangat panjang, karakter khusus, dan non-Latin/emoji.
+- Sumber mengubah format respons (`SOURCE_CHANGED`) → pesan jelas, aplikasi tidak crash.
+- Layar kecil (1366×768) dan skala tampilan Windows 125%/150%.
+- Kueri lambat tiba setelah kueri cepat (latest-wins).
 
 ## 14. Risiko Proyek
 
 | # | Risiko | Tingkat | Tanggapan |
 |---|---|---|---|
-| R1 | Sumber musik (YouTube Music) mengubah API internal atau memblokir akses | Tinggi | Isolasi modul lewat `MusicSource`; pembaruan bridge mandiri via arsip komponen |
-| R2 | Deteksi bot YouTube tanpa cookie memunculkan error `BLOCKED` | Sedang | Tangani dengan error code `BLOCKED` dan tampilkan pesan ramah ke pengguna |
-| R3 | Keusangan dependensi ekstraksi `yt-dlp` | Sedang | Mekanisme pembaruan bridge independen tanpa instal ulang aplikasi penuh |
-| R4 | Ketergantungan pada endpoint alternatif klien yt-dlp (bila ditutup) | Sedang | Rencana cadangan: bundel runtime JS ringan (QuickJS ~1,5 MB) bila challenge solver diwajibkan |
-| R5 | Kinerja di laptop RAM 4 GB belum divalidasi | Sedang | **Gerbang Pengujian M3:** wajib diuji pada laptop RAM ≤ 4 GB sebelum installer dibagikan |
-| R6 | Installer tak bertanda tangan diblokir Windows SmartScreen | Rendah | Sediakan checksum SHA-256 dan panduan klik "More info -> Run anyway" |
-| R7 | Pemeriksaan pembaruan komponen membutuhkan host rilis publik | Rendah | Transparan di dokumen privasi; hanya menghubungi release host publik tanpa identitas pengguna |
+| R1 | **Sumber musik (ytmusicapi/YouTube) melanggar ketentuan layanan YouTube, rapuh, dan bisa berhenti bekerja kapan saja; ada kemungkinan somasi dari pemegang hak cipta** | **Sangat tinggi** | Keputusan sadar pemilik produk. Mitigasi: lapisan `MusicSource`, distribusi terbatas ke lingkaran teman, tidak dipublikasikan luas, rencana pindah ke sumber legal kelak |
+| R2 | Unduh offline memperbesar risiko hukum karena menyalin audio | Tinggi | Ditunda; hanya dipertimbangkan bila sumbernya berlisensi bebas |
+| R3 | Target "ringan" tidak tercapai karena pembungkus dan runtime tambahan | Sedang | Spike K1/K3 selesai; divalidasi bertahap pada gerbang M3 |
+| R4 | Proyek tanpa tenggat macet di tengah jalan | Sedang | Milestone kecil (bagian 15) dengan hasil yang bisa dicoba |
+| R5 | Installer tidak ditandatangani memicu peringatan SmartScreen | Sedang | Checksum SHA-256, panduan singkat untuk teman, tanda tangan kode bila proyek membesar |
+| R6 | Pemblokiran massal oleh sumber bila banyak pengguna | Sedang | Cache hasil, batasi permintaan, distribusi tetap kecil |
+| R7 | Beban pemeliharaan menanggung perubahan sumber seorang diri | Sedang | Contract test otomatis, adaptor terisolasi |
+| R8 | Deteksi bot YouTube tanpa cookie memunculkan error `BLOCKED` | Sedang | Tangani dengan error code `BLOCKED` dan tampilkan pesan ramah ke pengguna |
+| R9 | Keusangan dependensi ekstraksi `yt-dlp` | Sedang | Desain pembaruan bridge mandiri via rilis GitHub tanpa unduh ulang Electron |
+| R10 | Ketergantungan pada endpoint alternatif klien yt-dlp (bila ditutup) | Sedang | Rencana cadangan: bundel runtime JS ringan (QuickJS ~1,5 MB) bila challenge solver diwajibkan |
+| R11 | Kinerja di laptop RAM 4 GB belum divalidasi | Sedang | **Gerbang Pengujian M3:** wajib diuji pada laptop RAM ≤ 4 GB sebelum installer dibagikan |
+| R12 | Pemeriksaan pembaruan komponen membutuhkan host rilis publik | Rendah | Transparan di dokumen privasi; hanya menghubungi release host publik tanpa identitas pengguna |
 
 ## 15. Rencana Rilis dan Milestone
 
-| Milestone | Status | Lingkup Utama | Kriteria Selesai |
+| Milestone | Status | Lingkup Utama | Hasil yang Bisa Dicoba |
 |---|---|---|---|
-| **M0. Spike Kelayakan** | **SELESAI** | Putuskan K1 (Python embed) & K3 (Electron); buktikan search -> resolve -> play; tangkap net-log & koneksi Python; ukur memori Private WS; hardening Electron fuses. | Draf laporan M0 selesai, installer rilis 135,5 MB terverifikasi. |
-| **M1. Pemutar Inti** | *Berikutnya* | UI Spotify dark theme, navigasi Beranda/Cari/Artis/Album, pemutar audio HTML5 tangguh, penanganan kedaluwarsa stream, SQLite settings & schema_meta. | Bisa mencari, membuka album/artis, memutar musik dengan kontrol penuh dan bebas crash. |
+| **M0. Spike Kelayakan** | **SELESAI** | Putuskan K1 (Python embed) & K3 (Electron); buktikan search → resolve → play; tangkap net-log & koneksi Python; ukur memori Private WS; hardening Electron fuses. | Prototipe mandiri memutar satu lagu, angka ukur nyata, installer 135,5 MB. |
+| **M1. Pemutar Inti** | *Sedang Berjalan* | UI Spotify dark theme, navigasi Beranda/Cari/Artis/Album, pemutar audio HTML5 tangguh, penanganan kedaluwarsa stream, SQLite settings & schema_meta. | Bisa mencari, membuka album/artis, memutar musik dengan kontrol penuh dan bebas crash. |
 | **M2. Pustaka & Playlist** | Terencana | Liked Songs, playlist lokal, antrean, acak, ulang, pemulihan antrean, skema database lengkap. | Pembuat dapat memakai aplikasi setiap hari untuk mendengar musik lokal. |
 | **M3. Pengerasan & Rilis Teman** | Terencana | Penanganan seluruh edge case, **Gerbang Pengujian Laptop RAM 4 GB**, installer final + SHA-256. | Lolos uji RAM 4 GB, installer siap dibagikan ke lingkaran teman terdekat. |
 | **M4. Fitur V2** | Terencana | Beranda rekomendasi lokal, lirik (bila ada sumber), berbagi playlist JSON, pembaruan komponen bertanda tangan Ed25519. | Pembaruan aplikasi mandiri dan fitur berbagi playlist aktif. |
+| **Evaluasi V3** | Terencana | Putuskan ulang soal unduh offline dan sumber musik jangka panjang. | Keputusan tertulis. |
+
+## 16. Ukuran Keberhasilan
+
+- **Utama:** teman-teman menyatakan senang memakai aplikasi (ditanyakan langsung, tanpa pelacakan apa pun).
+- **Kualitas:** tidak ada bug yang mengganggu fitur inti. Definisi: aplikasi tidak crash, lagu yang tersedia selalu bisa dicari dan diputar, playlist dan favorit tidak hilang. Bug kecil pada tampilan boleh ada dan diperbaiki bertahap.
+- **Kinerja:** memenuhi target bagian 9 di laptop uji RAM 4 GB (divalidasi di M3).
+- **Privasi:** pemeriksaan pra-rilis membuktikan tidak ada koneksi jaringan selain ke sumber musik (dan alamat pembaruan bila diaktifkan).
+
+## 17. Hasil Review Kritis (ringkasan perbaikan dari draf sebelumnya)
+
+| # | Temuan | Perbaikan di dokumen ini |
+|---|---|---|
+| 1 | ytmusicapi berbasis Python dan hanya memberi metadata, bukan audio; ini mengancam target "ringan" dan menambah komponen rapuh | Dicatat sebagai keputusan terbuka K1 dan K2, dengan spike M0 sebelum membangun (K1 diputuskan: Python 3.12.8 embed stdio JSON-RPC) |
+| 2 | Janji "tanpa pelacakan sama sekali" tidak akurat karena sumber musik tetap melihat IP | Pernyataan privasi diganti dengan versi yang jujur (bagian 12) |
+| 3 | Installer dibagikan lewat chat tanpa tanda tangan: risiko malware dan peringatan Windows | Checksum SHA-256, panduan verifikasi, pembaruan otomatis ditunda |
+| 4 | Impor playlist adalah input tak tepercaya | Validasi skema, batas ukuran, render teks, pratinjau (F6) |
+| 5 | PK gabungan `playlist_tracks` melarang lagu duplikat | Ditambah kolom `id` PK |
+| 6 | Tidak ada penanganan lagu yang hilang dari sumber | Kolom `is_available` dan `last_checked_at`, perilaku lompat dengan batas 5 |
+| 7 | Tidak ada rencana migrasi, korupsi data, atau instans ganda | `schema_meta`, cadangan otomatis, `integrity_check`, single-instance lock |
+| 8 | "Ringan" tidak terukur | Target angka awal (bagian 9) yang divalidasi bertahap menggunakan Private Working Set |
+| 9 | Alamat stream kedaluwarsa tidak dibahas | Persyaratan ambil ulang otomatis dan lanjutkan dari posisi terakhir (F2) |
+| 10 | Pengguna dengan kuota terbatas tidak dipertimbangkan | Kualitas audio dapat diatur, default hemat, perkiraan data dihitung dari bitrate |
+| 11 | Dukungan Windows lama ambigu | Ditetapkan Windows 10/11 64-bit |
+| 12 | Riwayat putar/cari bisa membengkak dan menyimpan data berlebihan | Batas entri dan tombol hapus |
+| 13 | "Selengkap Spotify" terlalu luas | Dipecah ke V1/V2/V3 dan daftar "Bukan tujuan" |
+| 14 | Lirik berhak cipta, sumber belum jelas | Keputusan K6, fitur ditunda sampai sumber jelas |
+| 15 | Beranda tidak konsisten (V1 vs V2) | V1: "Terakhir diputar" + pintasan; V2: rekomendasi |
+
+## 18. Pertanyaan yang Masih Perlu Dijawab Pemilik Produk
+
+1. Mana yang dipilih untuk K1 (cara menjalankan ytmusicapi) dan K3 (Electron atau Tauri) setelah spike M0? $\rightarrow$ **Terjawab di M0:** K1 = Python embeddable stdio JSON-RPC, K3 = Electron untuk V1.
+2. Apakah kode aplikasi akan dibuka (open source)?
+3. Berapa batas wajar jumlah teman pada tahap awal, agar risiko R1 dan R6 tetap kecil?
+4. Siapa yang akan menguji di laptop RAM 4 GB, dan apakah ada laptop uji yang bisa dipakai? $\rightarrow$ **Terjawab di M0:** Pemilik produk menguji di laptop RAM 4 GB miliknya pada Gerbang M3.
+5. Sumber lirik apa yang akan dipakai, atau fitur lirik ditunda?

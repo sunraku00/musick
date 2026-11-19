@@ -8,6 +8,12 @@ import { setupSecurityPolicies } from './security';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Keamanan Rilis: Blokir bendera remote-debugging-port di build rilis secara default.
+// Hanya build uji khusus dengan variabel MUSICK_TEST_HARNESS=1 yang dapat membuka port CDP.
+if (!process.env.MUSICK_TEST_HARNESS) {
+  app.commandLine.removeSwitch('remote-debugging-port');
+}
+
 // Registrasi skema app:// sebagai privileged sebelum app siap
 protocol.registerSchemesAsPrivileged([
   {
@@ -91,6 +97,12 @@ if (!gotTheLock) {
         const resolvedPath = path.resolve(rendererDir, reqPath);
 
         // Keamanan: cegah path traversal keluar dari folder renderer
+        const decodedUrl = decodeURIComponent(request.url);
+        if (decodedUrl.includes('..') || decodedUrl.includes('%2e%2e') || decodedUrl.includes('%2E%2E')) {
+          console.warn(`[Security] Percobaan path traversal diblokir: ${request.url}`);
+          return new Response('Access Denied', { status: 403 });
+        }
+
         const rel = path.relative(rendererDir, resolvedPath);
         if (rel.startsWith('..') || path.isAbsolute(rel)) {
           console.warn(`[Security] Percobaan path traversal diblokir: ${request.url}`);

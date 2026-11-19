@@ -1,0 +1,338 @@
+[
+  {
+    "id": "k1BfsO0mxWQ",
+    "title": "Sheila On 7 - Dan",
+    "best_audio": {
+      "itag": "251",
+      "ext": "webm",
+      "acodec": "opus",
+      "abr": 126.639,
+      "tbr": 126.639
+    },
+    "available_audio_formats": [
+      {
+        "itag": "sb3",
+        "ext": "mhtml",
+        "acodec": "none",
+        "abr": 0,
+        "tbr": null,
+        "filesize": null,
+        "format_note": "storyboard"
+      },
+      {
+        "itag": "sb2",
+        "ext": "mhtml",
+        "acodec": "none",
+        "abr": 0,
+        "tbr": null,
+        "filesize": null,
+        "format_note": "storyboard"
+      },
+      {
+        "itag": "sb1",
+        "ext": "mhtml",
+        "acodec": "none",
+        "abr": 0,
+        "tbr": null,
+        "filesize": null,
+        "format_note": "storyboard"
+      },
+      {
+        "itag": "sb0",
+        "ext": "mhtml",
+        "acodec": "none",
+        "abr": 0,
+        "tbr": null,
+        "filesize": null,
+        "format_note": "storyboard"
+      },
+      {
+        "itag": "233",
+        "ext": "mp4",
+        "acodec": null,
+        "abr": null,
+        "tbr": null,
+        "filesize": null,
+        "format_note": "Default, low"
+      },
+      {
+        "itag": "234",
+        "ext": "mp4",
+        "acodec": null,
+        "abr": null,
+        "tbr": null,
+        "filesize": null,
+        "format_note": "Default, high"
+      },
+      {
+        "itag": "139",
+        "ext": "m4a",
+        "acodec": "mp4a.40.5",
+        "abr": 48.843,
+        "tbr": 48.843,
+        "filesize": 1762690,
+        "format_note": "low"
+      },
+      {
+        "itag": "249",
+        "ext": "webm",
+        "acodec": "opus",
+        "abr": 49.157,
+        "tbr": 49.157,
+        "filesize": 1774112,
+        "format_note": "low"
+      },
+      {
+        "itag": "250",
+        "ext": "webm",
+        "acodec": "opus",
+        "abr": 65.021,
+        "tbr": 65.021,
+        "filesize": 2346640,
+        "format_note": "low"
+      },
+      {
+        "itag": "140",
+        "ext": "m4a",
+        "acodec": "mp4a.40.2",
+        "abr": 129.562,
+        "tbr": 129.562,
+        "filesize": 4675692,
+        "format_note": "medium"
+      },
+      {
+        "itag": "251",
+        "ext": "webm",
+        "acodec": "opus",
+        "abr": 126.639,
+        "tbr": 126.639,
+        "filesize": 4570445,
+        "format_note": "medium"
+      }
+    ]
+  },
+  {
+    "id": "kXYiU_JCYtU",
+    "title": "Linkin Park - Numb",
+    "best_audio": {
+      "itag": "251",
+      "ext": "webm",
+      "acodec": "opus",
+      "abr": 123.875,
+      "tbr": 123.875
+    },
+    "available_audio_formats": [
+      {
+        "itag": "sb3",
+        "ext": "mhtml",
+        "acodec": "none",
+        "abr": 0,
+        "tbr": null,
+        "filesize": null,
+        "format_note": "storyboard"
+      },
+      {
+        "itag": "sb2",
+        "ext": "mhtml",
+        "acodec": "none",
+        "abr": 0,
+        "tbr": null,
+        "filesize": null,
+        "format_note": "storyboard"
+      },
+      {
+        "itag": "sb1",
+        "ext": "mhtml",
+        "acodec": "none",
+        "abr": 0,
+        "tbr": null,
+        "filesize": null,
+        "format_note": "storyboard"
+      },
+      {
+        "itag": "sb0",
+        "ext": "mhtml",
+        "acodec": "none",
+        "abr": 0,
+        "tbr": null,
+        "filesize": null,
+        "format_note": "storyboard"
+      },
+      {
+        "itag": "233",
+        "ext": "mp4",
+        "acodec": null,
+        "abr": null,
+        "tbr": null,
+        "filesize": null,
+        "format_note": "Default, low"
+      },
+      {
+        "itag": "234",
+        "ext": "mp4",
+        "acodec": null,
+        "abr": null,
+        "tbr": null,
+        "filesize": null,
+        "format_note": "Default, high"
+      },
+      {
+        "itag": "139",
+        "ext": "m4a",
+        "acodec": "mp4a.40.5",
+        "abr": 48.815,
+        "tbr": 48.815,
+        "filesize": 1142852,
+        "format_note": "low"
+      },
+      {
+        "itag": "249",
+        "ext": "webm",
+        "acodec": "opus",
+        "abr": 47.803,
+        "tbr": 47.803,
+        "filesize": 1118360,
+        "format_note": "low"
+      },
+      {
+        "itag": "250",
+        "ext": "webm",
+        "acodec": "opus",
+        "abr": 63.078,
+        "tbr": 63.078,
+        "filesize": 1475721,
+        "format_note": "low"
+      },
+      {
+        "itag": "140",
+        "ext": "m4a",
+        "acodec": "mp4a.40.2",
+        "abr": 129.504,
+        "tbr": 129.504,
+        "filesize": 3030395,
+        "format_note": "medium"
+      },
+      {
+        "itag": "251",
+        "ext": "webm",
+        "acodec": "opus",
+        "abr": 123.875,
+        "tbr": 123.875,
+        "filesize": 2898086,
+        "format_note": "medium"
+      }
+    ]
+  },
+  {
+    "id": "fJ9rUzIMcZQ",
+    "title": "Queen - Bohemian Rhapsody",
+    "best_audio": {
+      "itag": "251",
+      "ext": "webm",
+      "acodec": "opus",
+      "abr": 132.569,
+      "tbr": 132.569
+    },
+    "available_audio_formats": [
+      {
+        "itag": "sb3",
+        "ext": "mhtml",
+        "acodec": "none",
+        "abr": 0,
+        "tbr": null,
+        "filesize": null,
+        "format_note": "storyboard"
+      },
+      {
+        "itag": "sb2",
+        "ext": "mhtml",
+        "acodec": "none",
+        "abr": 0,
+        "tbr": null,
+        "filesize": null,
+        "format_note": "storyboard"
+      },
+      {
+        "itag": "sb1",
+        "ext": "mhtml",
+        "acodec": "none",
+        "abr": 0,
+        "tbr": null,
+        "filesize": null,
+        "format_note": "storyboard"
+      },
+      {
+        "itag": "sb0",
+        "ext": "mhtml",
+        "acodec": "none",
+        "abr": 0,
+        "tbr": null,
+        "filesize": null,
+        "format_note": "storyboard"
+      },
+      {
+        "itag": "233",
+        "ext": "mp4",
+        "acodec": null,
+        "abr": null,
+        "tbr": null,
+        "filesize": null,
+        "format_note": "Default, low"
+      },
+      {
+        "itag": "234",
+        "ext": "mp4",
+        "acodec": null,
+        "abr": null,
+        "tbr": null,
+        "filesize": null,
+        "format_note": "Default, high"
+      },
+      {
+        "itag": "139",
+        "ext": "m4a",
+        "acodec": "mp4a.40.5",
+        "abr": 48.799,
+        "tbr": 48.799,
+        "filesize": 2193442,
+        "format_note": "low"
+      },
+      {
+        "itag": "249",
+        "ext": "webm",
+        "acodec": "opus",
+        "abr": 51.329,
+        "tbr": 51.329,
+        "filesize": 2306373,
+        "format_note": "low"
+      },
+      {
+        "itag": "250",
+        "ext": "webm",
+        "acodec": "opus",
+        "abr": 67.894,
+        "tbr": 67.894,
+        "filesize": 3050692,
+        "format_note": "low"
+      },
+      {
+        "itag": "140",
+        "ext": "m4a",
+        "acodec": "mp4a.40.2",
+        "abr": 129.488,
+        "tbr": 129.488,
+        "filesize": 5818745,
+        "format_note": "medium"
+      },
+      {
+        "itag": "251",
+        "ext": "webm",
+        "acodec": "opus",
+        "abr": 132.569,
+        "tbr": 132.569,
+        "filesize": 5956710,
+        "format_note": "medium"
+      }
+    ]
+  }
+]

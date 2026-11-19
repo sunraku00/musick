@@ -9,9 +9,9 @@ const mockResult = (q: string): SearchResult => ({
   albums: [],
 });
 
-describe('SearchCoordinator & BoundedSearchCache', () => {
-  it('cache harus membatasi maksimal 50 kueri dan menerapkan LRU eviction', () => {
-    const cache = new BoundedSearchCache(3); // batasi 3 untuk uji
+describe('SearchCoordinator & BoundedSearchCache Unit Tests', () => {
+  it('cache harus membatasi maksimal kapasitas dan menerapkan LRU eviction', () => {
+    const cache = new BoundedSearchCache(3);
     cache.set('a', mockResult('a'));
     cache.set('b', mockResult('b'));
     cache.set('c', mockResult('c'));
@@ -28,6 +28,21 @@ describe('SearchCoordinator & BoundedSearchCache', () => {
     expect(cache.get('a')?.query).toBe('a');
     expect(cache.get('c')?.query).toBe('c');
     expect(cache.get('d')?.query).toBe('d');
+  });
+
+  it('cache harus mengabaikan entri yang sudah melewati masa berlaku (TTL)', async () => {
+    const shortTtlMs = 50; // 50 ms untuk uji
+    const cache = new BoundedSearchCache(10, shortTtlMs);
+    cache.set('sheila', mockResult('sheila'));
+
+    // Sebelum TTL habis: masih ada
+    expect(cache.get('sheila')).not.toBeNull();
+
+    // Tunggu hingga melewati TTL
+    await new Promise((r) => setTimeout(r, 60));
+
+    // Setelah TTL habis: harus null
+    expect(cache.get('sheila')).toBeNull();
   });
 
   it('latest-wins harus membuang respons kueri lambat yang tiba setelah kueri baru', async () => {
@@ -48,12 +63,45 @@ describe('SearchCoordinator & BoundedSearchCache', () => {
 
     const [res1, res2] = await Promise.all([p1, p2]);
 
-    // Kueri 1 harus diabaikan (isLatest: false)
     expect(res1.isLatest).toBe(false);
     expect(res1.result).toBeNull();
-
-    // Kueri 2 harus diterima (isLatest: true)
     expect(res2.isLatest).toBe(true);
     expect(res2.result?.query).toBe('sheila on 7');
+  });
+
+  it('harus membatasi maksimal 2 permintaan konkuren dan mengantrekan permintaan berikutnya', async () => {
+    const coordinator = new SearchCoordinator();
+    let currentConcurrent = 0;
+    let maxObservedConcurrent = 0;
+
+    const slowFetcher = async (q: string) => {
+      currentConcurrent++;
+      maxObservedConcurrent = Math.max(maxObservedConcurrent, currentConcurrent);
+      await new Promise((r) => setTimeout(r, 40));
+      currentConcurrent--;
+      return mockResult(q);
+    };
+
+    // Jalankan 4 permintaan sekaligus
+    const queries = ['q1', 'q2', 'q3', 'q4'];
+    await Promise.all(queries.map((q) => coordinator.search(q, slowFetcher)));
+
+    // Konkurensi tidak boleh pernah melebihi 2
+    expect(maxObservedConcurrent).toBeLessThanOrEqual(2);
+  });
+
+  it('harus melempar error timeout jika permintaan melebihi batas waktu', async () => {
+    // SearchCoordinator dengan timeout custom lewat inheritance/instansiasi
+    const coordinator = new SearchCoordinator();
+    // Fetcher yang macet selamanya
+    const hangingFetcher = () => new Promise<SearchResult>(() => {});
+
+    // Buat kueri dengan mock coordinator bertimeout pendek (50ms)
+    const customCoordinator = new SearchCoordinator();
+    (customCoordinator as any).timeoutMs = 50;
+
+    await expect(customCoordinator.search('timeout-test', hangingFetcher)).rejects.toThrow(
+      'Waktu pencarian habis'
+    );
   });
 });

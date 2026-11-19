@@ -34,8 +34,10 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // Inisialisasi audio element sekali
   useEffect(() => {
     const audio = new Audio();
+    audio.id = 'musick-audio-engine';
     audio.preload = 'auto';
     audioRef.current = audio;
+    document.body.appendChild(audio);
 
     const clearStalledTimer = () => {
       if (stalledTimerRef.current) {
@@ -161,6 +163,9 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current.src = '';
+        if (audioRef.current.parentNode) {
+          audioRef.current.parentNode.removeChild(audioRef.current);
+        }
       }
     };
   }, [machine]);

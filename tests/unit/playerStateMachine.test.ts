@@ -129,6 +129,31 @@ describe('PlayerStateMachine Unit Tests', () => {
     expect(state.currentTrack?.title).toBe('Lagu Kedua');
   });
 
+  it('setelah alamat kedaluwarsa atau error, ambil ulang stream dan lanjutkan dari posisi terakhir (bukan dari detik 0)', () => {
+    const sm = new PlayerStateMachine();
+    const events: any[] = [];
+    sm.subscribe((e) => events.push(e));
+
+    sm.setQueue(mockTracks, 0);
+    sm.onStreamResolved();
+
+    // Pemutaran berjalan hingga detik ke-45
+    sm.onTimeUpdate(45, 180);
+    expect(sm.getState().positionSec).toBe(45);
+
+    // Terjadi error stream di tengah lagu (misal token expired)
+    sm.handleStreamError('NETWORK', 'Alamat stream kedaluwarsa');
+
+    // State machine harus memancarkan event NEED_RESOLVE dengan startPositionSec = 45 (bukan 0)
+    const resolveEvents = events.filter((e) => e.type === 'NEED_RESOLVE');
+    const lastResolve = resolveEvents[resolveEvents.length - 1];
+    expect(lastResolve).toBeDefined();
+    expect(lastResolve.track.id).toBe('mock:t1');
+    expect(lastResolve.startPositionSec).toBe(45);
+    expect(sm.getState().retryCount).toBe(1);
+    expect(sm.getState().status).toBe('loading');
+  });
+
   it('harus melakukan retry 2x berturut-turut pada lagu yang sama sebelum melompat ke track berikutnya', () => {
     const sm = new PlayerStateMachine();
     const events: any[] = [];

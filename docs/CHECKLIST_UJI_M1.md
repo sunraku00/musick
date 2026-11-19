@@ -51,3 +51,21 @@ Dokumen ini berisi panduan dan daftar periksa pengujian manual (*manual acceptan
 | 4.1 | **Navigasi Sidebar** | Klik menu "Beranda", "Cari", dan "Pengaturan" di sidebar kiri. | Halaman berganti seketika dengan transisi mulus; status pemutaran audio di bar bawah TIDAK terputus. | [ ] |
 | 4.2 | **Halaman Pengaturan** | Buka menu Pengaturan. | Tampil opsi kualitas audio "Hemat (WebM Opus ~128 kbps)" dengan keterangan perkiraan data ~55 MB/jam dan pernyataan privasi lokal. | [ ] |
 | 4.3 | **Keamanan Teks (No XSS)** | Cari lagu dengan karakter khusus (misal: `<script>alert(1)</script>`). | Teks dirender sebagai teks biasa murni; tidak ada eksekusi HTML/JavaScript. | [ ] |
+
+---
+
+## 5. Pemetaan Uji: Otomasi vs Verifikasi Manual Fisik
+
+### A. Bagian yang Berhasil Diotomatiskan Penuh (CDP - `scripts/automate_ui_flow.py`):
+1. Mengetik pada kolom Cari dengan debounce 400 ms.
+2. Memilih dan mengklik baris trek pertama dari hasil pencarian di UI.
+3. Memverifikasi audio HTML5 memutar (`audio.paused === false`) dan `currentTime` bertambah.
+4. Menekan tombol "Berikutnya" (⏭) dan memverifikasi pergantian judul lagu di PlayerBar.
+5. Melakukan seek posisi lagu ke tengah durasi dan memverifikasi `audio.currentTime`.
+6. Mengubah slider volume dan memverifikasi nilai `audio.volume`.
+
+### B. Bagian yang TIDAK Dapat Diotomatiskan via CDP (Wajib Checklist Manual Fisik):
+1. **Tombol Fisik Multimedia Keyboard Windows:** Menekan tombol Fn/Media Play/Pause/Next pada keyboard laptop/eksternal fisik untuk menguji respons Media Session API.
+2. **Pencabutan Fisik Perangkat Audio:** Mencabut jack audio 3.5mm atau memutuskan sambungan headset Bluetooth fisik untuk menguji penanganan event `devicechange` (jeda otomatis).
+3. **Siklus Tidur/Bangun Laptop (Sleep/Wake):** Menutup layar laptop (lid close) lalu membuka kembali untuk memverifikasi pemulihan status pemutar tanpa crash.
+4. **Dialog Peringatan Windows SmartScreen:** Memverifikasi tampilan prompt biru *"Windows protected your PC"* pada laptop Windows pengguna lain yang belum pernah memasang aplikasi.
