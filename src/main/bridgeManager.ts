@@ -97,9 +97,6 @@ export class BridgeManager {
       windowsHide: true,
       env: {
         ...process.env,
-        // Informasikan runtime Node bawaan jika ada untuk solver JS yt-dlp
-        NODE_PATH: process.execPath,
-        ELECTRON_RUN_AS_NODE: '1',
       },
     });
 
