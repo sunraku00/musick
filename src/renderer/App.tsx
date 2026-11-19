@@ -1,188 +1,82 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { MusicSourceError } from '../shared/errors';
-import type { SearchResult, SourceMeta, StreamInfo, Track } from '../shared/types';
+import React from 'react';
+import { NavigationProvider, useNavigation } from './contexts/NavigationContext';
+import { PlayerProvider, usePlayer } from './contexts/PlayerContext';
+import { Sidebar } from './components/Sidebar';
 import { PlayerBar } from './components/PlayerBar';
-import { SearchBar } from './components/SearchBar';
-import { SearchResults } from './components/SearchResults';
+import { HomePage } from './pages/HomePage';
+import { SearchPage } from './pages/SearchPage';
+import { SettingsPage } from './pages/SettingsPage';
 
-export const App: React.FC = () => {
-  // Renderer HANYA berinteraksi lewat window.musicApi yang diekspos oleh preload
-  const api = typeof window !== 'undefined' ? window.musicApi : undefined;
-
-  // State sumber musik aktif
-  const [activeSourceId, setActiveSourceId] = useState<string>('mock');
-  const [sources, setSources] = useState<SourceMeta[]>([]);
-
-  // State pencarian
-  const [searchResults, setSearchResults] = useState<SearchResult | null>(null);
-  const [isSearching, setIsSearching] = useState<boolean>(false);
-  const [searchError, setSearchError] = useState<string | null>(null);
-
-  // State pemutar
-  const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
-  const [streamInfo, setStreamInfo] = useState<StreamInfo | null>(null);
-  const [isLoadingStream, setIsLoadingStream] = useState<boolean>(false);
-  const [playbackNotification, setPlaybackNotification] = useState<string | null>(null);
-
-  // Ambil daftar sumber dan sumber aktif saat inisialisasi
-  useEffect(() => {
-    if (!api) return;
-    Promise.all([api.listSources(), api.getActiveSource()])
-      .then(([sourceList, currentId]) => {
-        setSources(sourceList);
-        setActiveSourceId(currentId);
-      })
-      .catch((err) => {
-        console.error('Gagal memuat daftar sumber musik:', err);
-      });
-  }, [api]);
-
-  const handleSourceChange = async (newId: string) => {
-    if (!api) return;
-    try {
-      await api.setActiveSource(newId);
-      setActiveSourceId(newId);
-      setSearchResults(null);
-      setSearchError(null);
-    } catch (err) {
-      console.error('Gagal mengganti sumber:', err);
-    }
-  };
-
-  const handleSearch = useCallback(
-    async (query: string) => {
-      if (!api) {
-        setSearchError('API musik tidak tersedia di lingkungan ini.');
-        return;
-      }
-      setIsSearching(true);
-      setSearchError(null);
-      try {
-        const results = await api.search(query);
-        setSearchResults(results);
-      } catch (err) {
-        if (err instanceof MusicSourceError) {
-          setSearchError(err.getUserMessage());
-        } else if (err && typeof err === 'object' && 'code' in err) {
-          setSearchError(MusicSourceError.fromJSON(err as any).getUserMessage());
-        } else {
-          setSearchError('Terjadi kesalahan saat mencari lagu.');
-        }
-      } finally {
-        setIsSearching(false);
-      }
-    },
-    [api]
-  );
-
-  const playTrack = useCallback(
-    async (track: Track, retryCount = 0) => {
-      if (!api) return;
-      setCurrentTrack(track);
-      setIsLoadingStream(true);
-      setPlaybackNotification(null);
-
-      try {
-        const info = await api.resolveStream(track.sourceId);
-        setStreamInfo(info);
-      } catch (err) {
-        console.error('Gagal mengambil stream:', err);
-        if (retryCount < 1) {
-          console.log('Mencoba ambil ulang stream 1x...');
-          return playTrack(track, retryCount + 1);
-        }
-        if (err instanceof MusicSourceError) {
-          setPlaybackNotification(err.getUserMessage());
-        } else if (err && typeof err === 'object' && 'code' in err) {
-          setPlaybackNotification(MusicSourceError.fromJSON(err as any).getUserMessage());
-        } else {
-          setPlaybackNotification('Gagal memutar lagu.');
-        }
-        setStreamInfo(null);
-      } finally {
-        setIsLoadingStream(false);
-      }
-    },
-    [api]
-  );
-
-  const handleStreamExpiredOrFailed = useCallback(() => {
-    if (currentTrack) {
-      console.warn('Alamat stream kedaluwarsa/gagal, memicu ambil ulang...');
-      playTrack(currentTrack);
-    }
-  }, [currentTrack, playTrack]);
+const AppContent: React.FC = () => {
+  const { currentPage } = useNavigation();
+  const { toastMessage } = usePlayer();
 
   return (
-    <div className="app-container">
-      <header className="app-header">
-        <div className="header-brand">
-          <span className="brand-logo">🎵</span>
-          <span className="brand-name">Musick</span>
-          <span className="badge-m0">M0 Spike</span>
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100vh',
+        width: '100vw',
+        backgroundColor: '#121212',
+        color: '#ffffff',
+        overflow: 'hidden',
+        fontFamily:
+          '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+      }}
+    >
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div
+          style={{
+            position: 'fixed',
+            top: '20px',
+            right: '20px',
+            backgroundColor: '#1db954',
+            color: '#000000',
+            fontWeight: 600,
+            fontSize: '13px',
+            padding: '10px 18px',
+            borderRadius: '6px',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)',
+            zIndex: 1000,
+            animation: 'fadeIn 0.2s ease-out',
+          }}
+        >
+          {toastMessage}
         </div>
+      )}
 
-        <div className="source-switcher">
-          <label htmlFor="source-select" className="source-label">
-            Sumber:
-          </label>
-          <select
-            id="source-select"
-            value={activeSourceId}
-            onChange={(e) => handleSourceChange(e.target.value)}
-            className="source-select"
-          >
-            {sources.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-        </div>
-      </header>
+      {/* Main Body (Sidebar + Content) */}
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+        <Sidebar />
 
-      <main className="app-main">
-        {!api && (
-          <div className="notification-banner">
-            <span>
-              Perhatian: window.musicApi belum terhubung (pastikan aplikasi dijalankan via Electron).
-            </span>
-          </div>
-        )}
+        <main
+          style={{
+            flex: 1,
+            overflowY: 'auto',
+            backgroundColor: '#121212',
+            paddingBottom: '24px',
+          }}
+        >
+          {currentPage === 'home' && <HomePage />}
+          {currentPage === 'search' && <SearchPage />}
+          {currentPage === 'settings' && <SettingsPage />}
+        </main>
+      </div>
 
-        <div className="search-section">
-          <SearchBar onSearch={handleSearch} isLoading={isSearching} />
-        </div>
-
-        {playbackNotification && (
-          <div className="notification-banner">
-            <span>{playbackNotification}</span>
-            <button
-              type="button"
-              className="notification-close"
-              onClick={() => setPlaybackNotification(null)}
-            >
-              ✕
-            </button>
-          </div>
-        )}
-
-        <div className="content-area">
-          <SearchResults
-            results={searchResults}
-            error={searchError}
-            onSelectTrack={playTrack}
-            activeTrackId={currentTrack?.id}
-          />
-        </div>
-      </main>
-
-      <PlayerBar
-        track={currentTrack}
-        streamInfo={streamInfo}
-        isLoadingStream={isLoadingStream}
-        onStreamExpiredOrFailed={handleStreamExpiredOrFailed}
-      />
+      {/* Bottom Player Bar */}
+      <PlayerBar />
     </div>
+  );
+};
+
+export const App: React.FC = () => {
+  return (
+    <NavigationProvider>
+      <PlayerProvider>
+        <AppContent />
+      </PlayerProvider>
+    </NavigationProvider>
   );
 };
