@@ -1,12 +1,26 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, protocol, net } from 'electron';
 import * as path from 'path';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 import { bridgeManager } from './bridgeManager';
 import { SourceManager, registerIpcHandlers } from './ipcHandlers';
 import { setupSecurityPolicies } from './security';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Registrasi skema app:// sebagai privileged sebelum app siap
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'app',
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      corsEnabled: false,
+      stream: true,
+    },
+  },
+]);
 
 let mainWindow: BrowserWindow | null = null;
 const sourceManager = new SourceManager();
@@ -38,7 +52,7 @@ function createWindow(): void {
   if (devServerUrl) {
     mainWindow.loadURL(devServerUrl);
   } else {
-    mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
+    mainWindow.loadURL('app://musick/index.html');
   }
 
   mainWindow.on('closed', () => {
@@ -62,8 +76,35 @@ if (!gotTheLock) {
   });
 
   app.whenReady().then(() => {
-    // Bridge Python sekarang dimuat secara "malas" (lazy):
-    // TIDAK dimulai saat app terbuka, melainkan saat permintaan pertama tiba.
+    // Daftarkan protokol kustom app:// untuk isolasi aset lokal tanpa file://
+    protocol.handle('app', (request) => {
+      try {
+        const parsedUrl = new URL(request.url);
+        let reqPath = path.normalize(decodeURIComponent(parsedUrl.pathname));
+        if (reqPath.startsWith('/') || reqPath.startsWith('\\')) {
+          reqPath = reqPath.slice(1);
+        }
+        if (!reqPath || reqPath === '.') {
+          reqPath = 'index.html';
+        }
+        const rendererDir = path.resolve(__dirname, '../renderer');
+        const resolvedPath = path.resolve(rendererDir, reqPath);
+
+        // Keamanan: cegah path traversal keluar dari folder renderer
+        const rel = path.relative(rendererDir, resolvedPath);
+        if (rel.startsWith('..') || path.isAbsolute(rel)) {
+          console.warn(`[Security] Percobaan path traversal diblokir: ${request.url}`);
+          return new Response('Access Denied', { status: 403 });
+        }
+
+        return net.fetch(pathToFileURL(resolvedPath).toString());
+      } catch (err) {
+        console.error('[Protocol app:// Error]:', err);
+        return new Response('Internal Server Error', { status: 500 });
+      }
+    });
+
+    // Bridge Python dimuat secara "malas" (lazy): saat ada permintaan pertama
     createWindow();
   });
 

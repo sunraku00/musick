@@ -39,8 +39,10 @@ export function setupSecurityPolicies(mainWindow: BrowserWindow): void {
 
   // Blokir navigasi jendela (will-navigate)
   mainWindow.webContents.on('will-navigate', (event, navigationUrl) => {
-    // Izinkan navigasi internal hanya ke URL dev lokal
-    const allowed = isDev && (navigationUrl.startsWith('http://localhost:') || navigationUrl.startsWith('http://127.0.0.1:'));
+    // Izinkan navigasi internal hanya ke URL dev lokal atau skema app://musick/
+    const allowed =
+      (isDev && (navigationUrl.startsWith('http://localhost:') || navigationUrl.startsWith('http://127.0.0.1:'))) ||
+      navigationUrl.startsWith('app://musick/');
     if (!allowed) {
       event.preventDefault();
       console.warn(`[Security] Navigasi ke ${navigationUrl} diblokir.`);
