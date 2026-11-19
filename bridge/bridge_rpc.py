@@ -215,8 +215,16 @@ def main():
             sys.stdout.flush()
         except Exception as e:
             err_msg = str(e)
-            code = 'RATE_LIMITED' if '429' in err_msg or 'Too Many Requests' in err_msg else 'NETWORK'
-            err_out = {'id': req_id, 'error': {'code': code, 'message': err_msg}}
+            if any(k in err_msg.lower() for k in ["sign in to confirm", "bot", "captcha", "blocked", "blokir"]):
+                code = 'BLOCKED'
+                clean_msg = "Akses dibatasi oleh sumber musik (deteksi bot/jaringan). Silakan coba beberapa saat lagi."
+                err_out = {'id': req_id, 'error': {'code': code, 'message': clean_msg}}
+            elif '429' in err_msg or 'too many requests' in err_msg.lower():
+                code = 'RATE_LIMITED'
+                err_out = {'id': req_id, 'error': {'code': code, 'message': err_msg}}
+            else:
+                code = 'NETWORK'
+                err_out = {'id': req_id, 'error': {'code': code, 'message': err_msg}}
             sys.stdout.write(json.dumps(err_out) + '\n')
             sys.stdout.flush()
 
