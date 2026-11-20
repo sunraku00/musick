@@ -91,7 +91,10 @@ export const Sidebar: React.FC = () => {
               <span style={{ fontSize: '16px' }}>{item.icon}</span>
               <span style={{ flex: 1 }}>{item.label}</span>
               {item.count !== undefined && item.count > 0 && (
-                <span id={`nav-${item.id}-count`} style={{ fontSize: '11px', color: '#888888' }}>
+                <span
+                  id={item.id === 'liked-songs' ? 'badge-liked-count' : `nav-${item.id}-count`}
+                  style={{ fontSize: '11px', color: '#888888' }}
+                >
                   {item.count}
                 </span>
               )}

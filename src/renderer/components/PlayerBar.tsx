@@ -141,7 +141,7 @@ export const PlayerBar: React.FC = () => {
         {currentTrack && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <button
-              id="btn-toggle-like"
+              id="btn-player-like"
               title={isCurrentTrackLiked ? 'Hapus dari Lagu Disukai' : 'Suka lagu ini'}
               onClick={handleToggleLike}
               style={{

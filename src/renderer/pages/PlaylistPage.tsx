@@ -254,7 +254,7 @@ export const PlaylistPage: React.FC = () => {
               <div
                 key={track.playlistTrackId}
                 data-playlist-track-id={track.playlistTrackId}
-                className="track-row"
+                className="track-row playlist-track-row"
                 onClick={() => playTrack(track, playlist.tracks)}
                 style={{
                   display: 'flex',
@@ -290,7 +290,7 @@ export const PlaylistPage: React.FC = () => {
 
                 <div style={{ flex: 1, minWidth: 0, marginRight: '16px' }}>
                   <div style={{ fontSize: '14px', fontWeight: 600, color: isCurrent ? '#1db954' : '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{track.title}</span>
+                    <span className="playlist-track-title" style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{track.title}</span>
                     {isTrackLoading && (
                       <span style={{ fontSize: '11px', color: '#1db954', fontWeight: 600, flexShrink: 0 }}>
                         Memuat...

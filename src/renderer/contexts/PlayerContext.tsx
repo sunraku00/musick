@@ -188,6 +188,12 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       navigator.mediaDevices.addEventListener('devicechange', handleDeviceChange);
     }
 
+    if (typeof window !== 'undefined') {
+      (window as any).__testPlayTrack = (track: Track) => {
+        machine.setQueue([track], 0);
+      };
+    }
+
     const unsubscribe = machine.subscribe(async (event) => {
       if (event.type === 'STATE_CHANGED') {
         setState(event.state);

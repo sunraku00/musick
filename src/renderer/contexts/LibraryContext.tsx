@@ -376,6 +376,22 @@ export const LibraryProvider: React.FC<{ children: React.ReactNode }> = ({ child
     []
   );
 
+  if (typeof window !== 'undefined') {
+    (window as any).__libraryContextForTest = {
+      likedTrackIds,
+      likedTracks,
+      playlists,
+      activePlaylist,
+      toggleLike,
+      createPlaylist,
+      renamePlaylist,
+      deletePlaylist,
+      addTrackToPlaylist,
+      removeTrackFromPlaylist,
+      reorderPlaylistTracks,
+    };
+  }
+
   return (
     <LibraryContext.Provider
       value={{

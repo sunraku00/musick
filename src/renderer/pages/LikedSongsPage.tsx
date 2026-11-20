@@ -77,7 +77,7 @@ export const LikedSongsPage: React.FC = () => {
             return (
               <div
                 key={track.id}
-                className="track-row"
+                className="track-row liked-track-row"
                 onClick={() => playTrack(track, tracks)}
                 style={{
                   display: 'flex',
@@ -113,7 +113,7 @@ export const LikedSongsPage: React.FC = () => {
 
                 <div style={{ flex: 1, minWidth: 0, marginRight: '16px' }}>
                   <div style={{ fontSize: '14px', fontWeight: 600, color: isCurrent ? '#1db954' : '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{track.title}</span>
+                    <span className="liked-track-title" style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{track.title}</span>
                     {isTrackLoading && (
                       <span style={{ fontSize: '11px', color: '#1db954', fontWeight: 600, flexShrink: 0 }}>
                         Memuat...
@@ -145,6 +145,7 @@ export const LikedSongsPage: React.FC = () => {
                 </button>
 
                 <button
+                  className="btn-track-like"
                   title="Hapus dari Lagu yang Disukai"
                   onClick={(e) => handleUnlike(track, e)}
                   style={{
