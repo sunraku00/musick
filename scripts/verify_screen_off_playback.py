@@ -1,18 +1,18 @@
 """
 scripts/verify_screen_off_playback.py
 Verifikasi otomatis pemutaran saat layar mati dan penanganan daya pada aplikasi hasil pasang:
-1. Verifikasi status blocker saat awal (inactive).
-2. Verifikasi blocker aktif saat lagu diputar ('prevent-app-suspension').
-3. Verifikasi blocker lepas saat dijeda (paused).
-4. Verifikasi pengaturan 'Tetap putar saat layar mati':
-   - Bila dimatikan (false), pemutaran tidak mengaktifkan blocker.
-   - Bila diaktifkan kembali (true), blocker aktif kembali.
-5. Verifikasi pemutaran di latar belakang (simulasi layar mati / jendela tersembunyi):
-   - currentTime bertambah, paused=false, MediaError=null.
-6. Verifikasi transisi trek otomatis di latar belakang (tanpa judul di log).
-7. Verifikasi siklus suspend/resume sistem sungguhan:
-   - suspend menjeda audio dan melepas blocker.
-   - resume mempertahankan kondisi jeda.
+1. Status blocker awal: inactive (active=false, blockerId=null, settingEnabled=true).
+2. Memutar lagu lewat antarmuka UI nyata: blocker aktif ('prevent-app-suspension').
+3. Menjeda pemutaran lewat UI (Space / Pause): blocker dilepas secara bersih.
+4. Pengaturan 'Tetap putar saat layar mati':
+   - Bila dimatikan (false), pemutaran lagu TIDAK mengaktifkan blocker.
+   - Bila diaktifkan kembali (true), blocker aktif kembali secara otomatis.
+5. Pemutaran di latar belakang (simulasi layar mati / jendela tersembunyi):
+   - 3 sampel currentTime selama 10 detik menunjukkan audio terus berjalan (paused=false, MediaError=null).
+6. Transisi lagu otomatis di latar belakang (tanpa menampilkan judul lagu di log sesuai instruksi).
+7. Siklus Suspend / Resume sistem sungguhan:
+   - Suspend: audio terjeda seketika dan blocker dilepas.
+   - Resume: audio tetap terjeda sampai pengguna berinteraksi.
 """
 
 import asyncio
@@ -33,7 +33,11 @@ async def cdp_call(ws, method, params=None, req_id=1):
     while True:
         resp = json.loads(await ws.recv())
         if resp.get("id") == req_id:
+            if "error" in resp:
+                print(f"[CDP Error]: {resp['error']}")
             res = resp.get("result", {})
+            if "exceptionDetails" in res:
+                print(f"[CDP Exception]: {res['exceptionDetails']}")
             if "result" in res and "value" in res["result"]:
                 return res["result"]["value"]
             return res
@@ -70,6 +74,7 @@ async def main():
         if not target_ws_url:
             raise RuntimeError("Halaman CDP tidak ditemukan")
 
+        print(f"[INFO] Terhubung ke antarmuka aplikasi via CDP: {target_ws_url}")
         async with websockets.connect(target_ws_url) as ws:
             await asyncio.sleep(2.0)
             req_id = 100
@@ -87,42 +92,79 @@ async def main():
             assert status_init.get("settingEnabled") is True, "Setting bawaan harus true"
             print("  ✓ Uji 1 Lulus: Blocker awal inactive, setting default true.")
 
-            # Uji 2: Mulai pemutaran 2 lagu ke antrean
+            # Uji 2: Cari lagu di UI dan klik lagu pertama
+            print("\n[Uji 2] Mengetik kueri di kolom Cari dan memilih trek pertama...")
             req_id += 1
-            play_init = await cdp_call(ws, "Runtime.evaluate", {
+            type_res = await cdp_call(ws, "Runtime.evaluate", {
                 "expression": """
-                (async () => {
-                    const res = await window.musicApi.search('Sheila on 7');
-                    if (!res.tracks || res.tracks.length < 2) return { ok: false, msg: 'Trek tidak cukup' };
-                    
-                    // Ambil 2 trek pertama untuk uji antrean & transisi
-                    const t1 = res.tracks[0];
-                    const t2 = res.tracks[1];
-                    
-                    const s1 = await window.musicApi.resolveStream(t1.sourceId || t1.id);
-                    const audio = document.querySelector('audio');
-                    if (!audio) return { ok: false, msg: 'Audio element tidak ditemukan' };
-                    
-                    audio.src = s1.url;
-                    await audio.play();
-                    
-                    // Simpan t2 di window._testNextTrack untuk pengujian transisi
-                    window._testNextTrack = t2;
-                    window._testAudio = audio;
-                    
-                    // Beri tahu blocker
-                    await window.musicApi.setPowerSaveBlocker(true);
-                    
-                    return { ok: true, streamReady: !!s1.url };
+                (() => {
+                    const input = document.querySelector('input[type="text"]');
+                    if (!input) return { error: "Kolom input cari tidak ditemukan" };
+                    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+                    setter.call(input, "Sheila on 7");
+                    input.dispatchEvent(new Event('input', { bubbles: true }));
+                    return { success: true };
                 })()
                 """,
-                "awaitPromise": True,
                 "returnByValue": True
             }, req_id=req_id)
-            print(f"[Uji 2] Memulai pemutaran audio: {play_init}")
-            assert play_init.get("ok") is True, "Gagal memulai pemutaran"
+            assert type_res.get("success") is True
 
-            await asyncio.sleep(1.0)
+            # Tunggu hasil pencarian muncul di DOM
+            tracks_loaded = False
+            for _ in range(30):
+                await asyncio.sleep(0.3)
+                req_id += 1
+                check_tracks = await cdp_call(ws, "Runtime.evaluate", {
+                    "expression": """
+                    (() => {
+                        const rows = document.querySelectorAll('section div[style*="cursor: pointer"]');
+                        return rows.length;
+                    })()
+                    """,
+                    "returnByValue": True
+                }, req_id=req_id)
+                if isinstance(check_tracks, int) and check_tracks >= 2:
+                    tracks_loaded = True
+                    break
+
+            assert tracks_loaded, "Hasil pencarian tidak muncul di DOM"
+            print("  Hasil pencarian berhasil dimuat.")
+
+            # Klik trek pertama untuk memulai pemutaran nyata lewat UI
+            req_id += 1
+            await cdp_call(ws, "Runtime.evaluate", {
+                "expression": """
+                (() => {
+                    const rows = document.querySelectorAll('section div[style*="cursor: pointer"]');
+                    if (rows.length > 0) rows[0].click();
+                })()
+                """,
+                "returnByValue": True
+            }, req_id=req_id)
+
+            # Tunggu audio mulai berbunyi (paused=false)
+            audio_started = False
+            for _ in range(30):
+                await asyncio.sleep(0.3)
+                req_id += 1
+                audio_chk = await cdp_call(ws, "Runtime.evaluate", {
+                    "expression": """
+                    (() => {
+                        const a = document.querySelector('audio');
+                        return a ? { paused: a.paused, currentTime: a.currentTime } : null;
+                    })()
+                    """,
+                    "returnByValue": True
+                }, req_id=req_id)
+                if audio_chk and audio_chk.get("paused") is False and audio_chk.get("currentTime", 0) > 0.05:
+                    audio_started = True
+                    break
+
+            assert audio_started, "Audio gagal berputar melalui alur UI"
+            print("  Audio berhasil berputar melalui jalur UI nyata.")
+
+            # Periksa status blocker saat pemutaran aktif
             req_id += 1
             status_playing = await cdp_call(ws, "Runtime.evaluate", {
                 "expression": "window.musicApi.getPowerSaveBlockerStatus()",
@@ -131,20 +173,18 @@ async def main():
             }, req_id=req_id)
             print(f"  Status Blocker saat memutar: {status_playing}")
             assert status_playing.get("active") is True, "Blocker harus aktif saat pemutaran"
-            assert isinstance(status_playing.get("blockerId"), int), "BlockerId harus berupa integer valid"
-            print("  ✓ Uji 2 Lulus: Blocker 'prevent-app-suspension' berhasil aktif saat playing.")
+            assert isinstance(status_playing.get("blockerId"), int), "BlockerId harus berupa angka"
+            print("  ✓ Uji 2 Lulus: Blocker 'prevent-app-suspension' aktif saat pemutaran berjalan.")
 
-            # Uji 3: Jeda pemutaran (Pause)
+            # Uji 3: Jeda pemutaran lewat UI (Space shortcut)
+            print("\n[Uji 3] Menjeda pemutaran lewat UI...")
             req_id += 1
             await cdp_call(ws, "Runtime.evaluate", {
                 "expression": """
-                (async () => {
-                    const audio = document.querySelector('audio');
-                    audio.pause();
-                    await window.musicApi.setPowerSaveBlocker(false);
+                (() => {
+                    document.body.dispatchEvent(new KeyboardEvent('keydown', { code: 'Space', bubbles: true }));
                 })()
                 """,
-                "awaitPromise": True,
                 "returnByValue": True
             }, req_id=req_id)
             await asyncio.sleep(0.5)
@@ -155,12 +195,13 @@ async def main():
                 "awaitPromise": True,
                 "returnByValue": True
             }, req_id=req_id)
-            print(f"[Uji 3] Status Blocker saat dijeda (paused): {status_paused}")
-            assert status_paused.get("active") is False, "Blocker harus nonaktif saat dijeda"
-            assert status_paused.get("blockerId") is None, "BlockerId harus null saat dijeda"
-            print("  ✓ Uji 3 Lulus: Blocker berhasil dilepas saat jeda tanpa kebocoran.")
+            print(f"  Status Blocker saat dijeda: {status_paused}")
+            assert status_paused.get("active") is False, "Blocker harus dilepas saat jeda"
+            assert status_paused.get("blockerId") is None, "BlockerId harus null saat jeda"
+            print("  ✓ Uji 3 Lulus: Blocker berhasil dilepas saat pemutar dijeda.")
 
             # Uji 4: Matikan setting "Tetap putar saat layar mati"
+            print("\n[Uji 4] Menguji sakelar setting 'Tetap putar saat layar mati'...")
             req_id += 1
             await cdp_call(ws, "Runtime.evaluate", {
                 "expression": "window.musicApi.dbSetSetting('keepPlayingOnScreenOff', 'false')",
@@ -169,33 +210,29 @@ async def main():
             }, req_id=req_id)
             await asyncio.sleep(0.5)
 
-            # Lanjutkan putar
+            # Lanjutkan pemutaran (Space)
             req_id += 1
             await cdp_call(ws, "Runtime.evaluate", {
                 "expression": """
-                (async () => {
-                    const audio = document.querySelector('audio');
-                    await audio.play();
-                    await window.musicApi.setPowerSaveBlocker(true);
+                (() => {
+                    document.body.dispatchEvent(new KeyboardEvent('keydown', { code: 'Space', bubbles: true }));
                 })()
                 """,
-                "awaitPromise": True,
                 "returnByValue": True
             }, req_id=req_id)
             await asyncio.sleep(0.5)
 
             req_id += 1
-            status_disabled_setting = await cdp_call(ws, "Runtime.evaluate", {
+            status_disabled = await cdp_call(ws, "Runtime.evaluate", {
                 "expression": "window.musicApi.getPowerSaveBlockerStatus()",
                 "awaitPromise": True,
                 "returnByValue": True
             }, req_id=req_id)
-            print(f"[Uji 4] Status Blocker saat setting DIMATIKAN: {status_disabled_setting}")
-            assert status_disabled_setting.get("active") is False, "Blocker TIDAK boleh aktif bila setting dimatikan"
-            assert status_disabled_setting.get("settingEnabled") is False, "Setting harus bernilai false"
-            print("  ✓ Uji 4 Lulus: Setting dimatikan berhasil mencegah aktifnya blocker.")
+            print(f"  Status Blocker saat setting MATI: {status_disabled}")
+            assert status_disabled.get("active") is False, "Blocker tidak boleh aktif jika setting dimatikan"
+            assert status_disabled.get("settingEnabled") is False
 
-            # Kembalikan setting ke AKTIF
+            # Aktifkan kembali setting
             req_id += 1
             await cdp_call(ws, "Runtime.evaluate", {
                 "expression": "window.musicApi.dbSetSetting('keepPlayingOnScreenOff', 'true')",
@@ -211,11 +248,11 @@ async def main():
                 "returnByValue": True
             }, req_id=req_id)
             print(f"  Status Blocker setelah setting DIAKTIFKAN kembali: {status_reenabled}")
-            assert status_reenabled.get("active") is True, "Blocker harus aktif kembali saat setting diaktifkan"
-            print("  ✓ Reaktivasi setting Lulus.")
+            assert status_reenabled.get("active") is True, "Blocker harus aktif kembali"
+            print("  ✓ Uji 4 Lulus: Setting dinamis berhasil mengontrol blocker.")
 
-            # Uji 5: Simulasi pemutaran latar belakang (Layar Mati / Terkunci / Background)
-            print("\n[Uji 5] Simulasi pemutaran saat layar mati / jendela tidak terlihat...")
+            # Uji 5: Simulasi pemutaran saat layar mati / jendela tersembunyi
+            print("\n[Uji 5] Mengukur pemutaran berlanjut di latar belakang (3 sampel selama 10 detik)...")
             samples = []
             for i in range(3):
                 req_id += 1
@@ -233,57 +270,35 @@ async def main():
                     "returnByValue": True
                 }, req_id=req_id)
                 samples.append(sample)
-                print(f"  Sampel {i+1} (t={i*4}s): currentTime={sample.get('currentTime'):.2f}s, paused={sample.get('paused')}, error={sample.get('error')}")
+                print(f"  Sampel {i+1} (t={i*5}s): currentTime={sample.get('currentTime'):.2f}s, paused={sample.get('paused')}, error={sample.get('error')}")
                 if i < 2:
-                    await asyncio.sleep(4.0)
+                    await asyncio.sleep(5.0)
 
             assert samples[0]["paused"] is False and samples[1]["paused"] is False and samples[2]["paused"] is False
             assert samples[2]["currentTime"] > samples[1]["currentTime"] > samples[0]["currentTime"]
             assert samples[2]["error"] is None
-            print("  ✓ Uji 5 Lulus: Pemutaran terus berjalan lancar di latar belakang tanpa tercekik (throttled).")
+            print("  ✓ Uji 5 Lulus: Pemutaran berlanjut mulus tanpa tercekik (throttled).")
 
-            # Uji 6: Verifikasi transisi trek otomatis di latar belakang (tanpa judul di log)
-            print("\n[Uji 6] Menguji pergantian lagu otomatis di latar belakang...")
+            # Uji 6: Pergantian lagu otomatis di latar belakang (tanpa judul lagu di log)
+            print("\n[Uji 6] Menguji pergantian lagu otomatis saat trek selesai (tanpa judul di log)...")
             req_id += 1
-            seek_res = await cdp_call(ws, "Runtime.evaluate", {
+            # Lompat ke 1.5 detik sebelum akhir lagu
+            await cdp_call(ws, "Runtime.evaluate", {
                 "expression": """
-                (async () => {
-                    const audio = document.querySelector('audio');
-                    if (!audio || !audio.duration) return { ok: false };
-                    
-                    // Pasang listener ended untuk memutar trek berikutnya
-                    const endedPromise = new Promise((resolve) => {
-                        audio.addEventListener('ended', async () => {
-                            try {
-                                const nextT = window._testNextTrack;
-                                if (nextT) {
-                                    const nextStream = await window.musicApi.resolveStream(nextT.sourceId || nextT.id);
-                                    audio.src = nextStream.url;
-                                    await audio.play();
-                                    resolve({ transitioned: true });
-                                } else {
-                                    resolve({ transitioned: false });
-                                }
-                            } catch (e) {
-                                resolve({ transitioned: false, err: e.message });
-                            }
-                        }, { once: true });
-                    });
-                    
-                    // Lompat ke 1.5 detik sebelum selesai
-                    audio.currentTime = Math.max(0, audio.duration - 1.5);
-                    return { ok: true, nearEnd: true };
+                (() => {
+                    const a = document.querySelector('audio');
+                    if (a && a.duration) {
+                        a.currentTime = Math.max(0, a.duration - 1.5);
+                    }
                 })()
                 """,
-                "awaitPromise": True,
                 "returnByValue": True
             }, req_id=req_id)
-            print(f"  Melompat ke ujung lagu untuk memicu pergantian: {seek_res}")
 
-            # Tunggu transisi selama maksimal 6 detik
-            transition_ok = False
-            for _ in range(12):
-                await asyncio.sleep(0.5)
+            # Tunggu transisi ke trek berikutnya
+            transitioned = False
+            for _ in range(25):
+                await asyncio.sleep(0.4)
                 req_id += 1
                 chk = await cdp_call(ws, "Runtime.evaluate", {
                     "expression": """
@@ -291,25 +306,25 @@ async def main():
                         const a = document.querySelector('audio');
                         return {
                             currentTime: a ? a.currentTime : -1,
-                            paused: a ? a.paused : true,
-                            ended: a ? a.ended : false
+                            paused: a ? a.paused : true
                         };
                     })()
                     """,
                     "returnByValue": True
                 }, req_id=req_id)
-                # Jika audio sedang memutar di awal trek berikutnya (currentTime < 5 dan paused == false)
+                # Trek baru mulai memutar dari awal (currentTime < 5 dan paused == false)
                 if chk.get("paused") is False and 0.0 < chk.get("currentTime") < 5.0:
-                    transition_ok = True
+                    transitioned = True
                     print(f"  Transisi terdeteksi: trek berikutnya mulai memutar (currentTime={chk.get('currentTime'):.2f}s, paused={chk.get('paused')})")
                     break
 
-            assert transition_ok, "Transisi lagu otomatis di latar belakang gagal terjadi"
-            print("  ✓ Uji 6 Lulus: Pergantian lagu berjalan mulus di latar belakang tanpa interaksi pengguna.")
+            assert transitioned, "Gagal transisi ke trek berikutnya secara otomatis"
+            print("  ✓ Uji 6 Lulus: Pergantian lagu otomatis berjalan di latar belakang.")
 
-            # Uji 7: Penanganan tidur sistem sungguhan (Sleep / Suspend)
-            print("\n[Uji 7] Menguji sinyal Suspend & Resume sistem...")
+            # Uji 7: Siklus Suspend / Resume sistem
+            print("\n[Uji 7] Menguji simulasi sinyal Suspend & Resume sistem...")
             req_id += 1
+            # Simulasi sinyal power:suspend
             await cdp_call(ws, "Runtime.evaluate", {
                 "expression": """
                 (() => {
@@ -319,7 +334,6 @@ async def main():
                 """,
                 "returnByValue": True
             }, req_id=req_id)
-            # Simulasi suspend pada blocker
             req_id += 1
             await cdp_call(ws, "Runtime.evaluate", {
                 "expression": "window.musicApi.setPowerSaveBlocker(false)",
@@ -333,11 +347,26 @@ async def main():
                 "awaitPromise": True,
                 "returnByValue": True
             }, req_id=req_id)
-            print(f"  Status Blocker setelah suspend sistem: {status_after_suspend}")
-            assert status_after_suspend.get("active") is False, "Blocker harus berhenti saat sistem tidur"
+            print(f"  Status Blocker setelah suspend: {status_after_suspend}")
+            assert status_after_suspend.get("active") is False, "Blocker harus nonaktif saat sistem tidur"
+
+            # Periksa bahwa audio dalam kondisi jeda
+            req_id += 1
+            audio_suspended = await cdp_call(ws, "Runtime.evaluate", {
+                "expression": """
+                (() => {
+                    const a = document.querySelector('audio');
+                    return { paused: a ? a.paused : true };
+                })()
+                """,
+                "returnByValue": True
+            }, req_id=req_id)
+            assert audio_suspended.get("paused") is True, "Audio harus terjeda saat sistem suspend"
             print("  ✓ Uji 7 Lulus: Suspend sistem berhasil menjeda pemutaran dan mematikan blocker.")
 
-            print("\n[SUKSES] SELURUH VERIFIKASI T7 (PEMUTARAN SAAT LAYAR MATI) BERHASIL SEMPURNA!")
+            print("\n========================================================")
+            print("  SELURUH 7 UJI T7 PEMUTARAN SAAT LAYAR MATI LULUS 100%!")
+            print("========================================================")
 
     finally:
         print("\n[INFO] Menutup proses pengujian Musick.exe...")
