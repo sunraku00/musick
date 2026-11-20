@@ -73,10 +73,10 @@ Dokumen ini berisi panduan dan daftar periksa pengujian manual (*manual acceptan
 | 5.9 | **Smoke Test Binary Rilis Mandiri** | Jalankan `scripts/smoke_test_release.py` pada build hasil instalasi tanpa CDP / env var uji. | Membaca `%APPDATA%\Musick\runtime-status.json` dan membuktikan `isPackaged === true`, sumber aktif `ytmusic`, dan mock source tidak ada. | [x] Terverifikasi Otomatis |
 | 5.10 | **Pengerasan DB & Hapus Riwayat Permanen** | Tekan tombol "Hapus Riwayat Putar & Cari" di Pengaturan. | Seluruh baris riwayat putar dan riwayat pencarian dihapus permanen dari berkas `musick.db` (baris = 0). | [x] Terverifikasi Otomatis |
 | 5.11 | **Pencarian 1 Request Unfiltered (Tab Semua)** | Ketik kata kunci pada kolom Cari. | Mengirimkan tepat 1 permintaan tanpa filter (hasil campuran), menghemat 66,7% beban HTTP dan mematuhi throttle 250ms. | [x] Terverifikasi Otomatis |
-| 5.12 | **Pemutaran Saat Layar Mati (Display Off Timeout)** | Biarkan laptop hingga batas waktu layar mati tercapai tanpa menutup lid. | Audio tetap mengalir lancar, `prevent-app-suspension` aktif, panel layar mati normal. | [x] Terverifikasi Otomatis (CDP Simulation) / [ ] Belum diverifikasi di perangkat nyata |
-| 5.13 | **Kunci Layar (Lock Screen Win+L)** | Kunci layar Windows (Win+L) saat pemutaran sedang berlangsung. | Audio terus berlanjut tanpa tercekik (timer renderer aktif berkat `backgroundThrottling: false`). | [x] Terverifikasi Otomatis (CDP Simulation) / [ ] Belum diverifikasi di perangkat nyata |
-| 5.14 | **Tidur Idle Sistem (Idle System Sleep)** | Biarkan komputer menyala tanpa aktivitas hingga batas waktu tidur sistem saat memutar musik. | Pemutaran musik mencegah tidur sistem karena idle via `prevent-app-suspension`. Saat pemutar jeda, komputer tidur normal. | [x] Terverifikasi Otomatis |
-| 5.15 | **Tutup Layar Manual (Lid Close) & Sleep Manual** | Tutup penutup laptop atau pilih Start > Sleep (catatan: di luar kendali aplikasi, mengikuti setelan Windows). | Jika setelan "Sleep" atau Sleep manual, event `suspend` tertangkap, audio terjeda dan posisi tersimpan; saat bangun tetap jeda dan bisa dilanjutkan dengan 1x klik Play dari posisi terakhir. Jika setelan lid "Do nothing", musik terus berlanjut. | [x] Terverifikasi Otomatis (CDP Simulation) / [ ] Belum diverifikasi di perangkat nyata |
+| 5.12 | **Pemutaran Saat Layar Mati (Display Off Timeout)** | Biarkan laptop hingga batas waktu layar mati tercapai tanpa menutup lid. | Audio tetap mengalir lancar, `prevent-app-suspension` aktif, panel layar mati normal. | [ ] Belum diverifikasi di perangkat nyata |
+| 5.13 | **Kunci Layar (Lock Screen Win+L)** | Kunci layar Windows (Win+L) saat pemutaran sedang berlangsung. | Audio terus berlanjut tanpa tercekik (timer renderer aktif berkat `backgroundThrottling: false`). | [x] Diverifikasi manual oleh pemilik produk, 20 Nov 2026 |
+| 5.14 | **Tidur Idle Sistem (Idle System Sleep)** | Biarkan komputer menyala tanpa aktivitas hingga batas waktu tidur sistem saat memutar musik. | Pemutaran musik mencegah tidur sistem karena idle via `prevent-app-suspension`. Saat pemutar jeda, komputer tidur normal. | [ ] Belum diverifikasi di perangkat nyata |
+| 5.15 | **Tutup Layar Manual (Lid Close) & Sleep Manual** | Tutup penutup laptop atau pilih Start > Sleep (catatan: di luar kendali aplikasi, mengikuti setelan Windows). | Jika setelan "Sleep" atau Sleep manual, event `suspend` tertangkap, audio terjeda dan posisi tersimpan; saat bangun tetap jeda dan bisa dilanjutkan dengan 1x klik Play dari posisi terakhir. Jika setelan lid "Do nothing", musik terus berlanjut. | [ ] Belum diverifikasi di perangkat nyata |
 | 5.16 | **Opsi 'Tetap putar saat layar mati'** | Matikan toggle "Tetap putar saat layar mati" di Pengaturan, lalu putar musik. | Blocker daya tidak diaktifkan (`active: false, settingEnabled: false`), menghormati preferensi hemat baterai. | [x] Terverifikasi Otomatis |
 
 ---
@@ -98,10 +98,11 @@ Dokumen ini berisi panduan dan daftar periksa pengujian manual (*manual acceptan
 12. Transisi lagu otomatis di latar belakang saat jendela tidak terlihat.
 13. Sakelar pengaturan "Tetap putar saat layar mati" mengontrol status blocker secara dinamis.
 
-### B. Bagian yang Memerlukan Checklist Manual Fisik (Lingkungan Nyata):
-1. **Tombol Fisik Multimedia Keyboard Windows:** Menekan tombol Fn/Media Play/Pause/Next pada keyboard laptop/eksternal fisik untuk menguji respons Media Session API.
-2. **Pencabutan Fisik Perangkat Audio:** Mencabut jack audio 3.5mm atau memutuskan sambungan headset Bluetooth fisik untuk menguji penanganan event `devicechange` (jeda otomatis).
-3. **Siklus Tidur/Bangun Laptop (Sleep/Wake) Fisik:** Menutup layar laptop (lid close) dengan setelan Windows "Sleep" lalu membuka kembali untuk memverifikasi pemulihan status pemutar tanpa crash.
-4. **Layar Mati Fisik (Display Timeout):** Menunggu layar laptop mati sendiri tanpa menyentuh keyboard/mouse dan mendengarkan audio speaker tetap mengalir.
-5. **Kunci Layar Fisik (Win+L):** Menekan Win+L di keyboard fisik dan memastikan audio tidak tersendat.
-6. **Dialog Peringatan Windows SmartScreen:** Memverifikasi tampilan prompt biru *"Windows protected your PC"* pada laptop Windows pengguna lain yang belum pernah memasang aplikasi.
+### B. Bagian Checklist Manual Fisik (Lingkungan Nyata):
+1. **Kunci Layar Fisik (Win+L):** [x] Diverifikasi manual oleh pemilik produk, 20 Nov 2026 (LULUS, pemutaran musik tetap berjalan lancar pada build 0.1.3).
+2. **Layar Mati Fisik (Display Timeout):** [ ] Belum diverifikasi di perangkat nyata (dilewati oleh pemilik produk).
+3. **Tidur Idle Sistem Fisik:** [ ] Belum diverifikasi di perangkat nyata (dilewati oleh pemilik produk).
+4. **Tutup Layar Fisik (Lid Close) & Sleep Manual:** [ ] Belum diverifikasi di perangkat nyata (dilewati oleh pemilik produk; mengikuti setelan Windows).
+5. **Pencabutan Fisik Perangkat Audio (Headphone):** [ ] Belum diverifikasi di perangkat nyata (dilewati oleh pemilik produk).
+6. **Tombol Fisik Multimedia Keyboard Windows:** [ ] Belum diverifikasi di perangkat nyata.
+7. **Dialog Peringatan Windows SmartScreen:** [ ] Belum diverifikasi di perangkat nyata.
