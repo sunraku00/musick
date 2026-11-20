@@ -1,6 +1,6 @@
-import { app, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain } from 'electron';
 import { MusicSourceError, type MusicSourceErrorPayload } from '../shared/errors';
-import { IPC_CHANNELS, type AppInfo, type SavedPlayback } from '../shared/ipc';
+import { IPC_CHANNELS, type AppInfo, type LibraryChangeEvent, type SavedPlayback } from '../shared/ipc';
 import type { MusicSource } from '../shared/source';
 import type { SourceMeta, Track } from '../shared/types';
 import { MockSource } from './adapters/mock/mockSource';
@@ -205,9 +205,26 @@ export function registerIpcHandlers(
     return { active: false, blockerId: null, settingEnabled: true };
   });
 
+  // Helper penyiaran event perubahan perpustakaan ke seluruh jendela renderer
+  const broadcastLibrary = (event: LibraryChangeEvent) => {
+    try {
+      const windows = BrowserWindow.getAllWindows();
+      for (const win of windows) {
+        if (!win.isDestroyed()) {
+          win.webContents.send(IPC_CHANNELS.LIBRARY_CHANGED, event);
+        }
+      }
+    } catch (err) {
+      console.warn('[IPC] Gagal menyiarkan library:changed:', err);
+    }
+  };
+
   // Handler Liked Songs & Playlist Core (M2.1)
   handleIpc(IPC_CHANNELS.DB_TOGGLE_LIKE_TRACK, async (track: Track) => {
-    return dbService ? dbService.toggleLikeTrack(track) : false;
+    if (!dbService) return false;
+    const isLiked = dbService.toggleLikeTrack(track);
+    broadcastLibrary({ type: 'like', trackId: track.id, isLiked, track });
+    return isLiked;
   });
 
   handleIpc(IPC_CHANNELS.DB_IS_TRACK_LIKED, async (trackId: string) => {
@@ -220,7 +237,9 @@ export function registerIpcHandlers(
 
   handleIpc(IPC_CHANNELS.DB_CREATE_PLAYLIST, async (name: string, description?: string) => {
     if (!dbService) throw new Error('Database tidak tersedia');
-    return dbService.createPlaylist(name, description);
+    const playlist = dbService.createPlaylist(name, description);
+    broadcastLibrary({ type: 'playlist_created', playlist });
+    return playlist;
   });
 
   handleIpc(IPC_CHANNELS.DB_GET_PLAYLISTS, async () => {
@@ -231,16 +250,34 @@ export function registerIpcHandlers(
     return dbService ? dbService.getPlaylist(playlistId) : null;
   });
 
-  handleIpc(IPC_CHANNELS.DB_ADD_TRACK_TO_PLAYLIST, async (playlistId: number, track: Track) => {
+  handleIpc(IPC_CHANNELS.DB_RENAME_PLAYLIST, async (playlistId: number, name: string) => {
     if (!dbService) throw new Error('Database tidak tersedia');
-    return dbService.addTrackToPlaylist(playlistId, track);
+    dbService.renamePlaylist(playlistId, name);
+    broadcastLibrary({ type: 'playlist_renamed', playlistId, name });
   });
 
-  handleIpc(IPC_CHANNELS.DB_REMOVE_TRACK_FROM_PLAYLIST, async (playlistTrackId: number) => {
-    if (dbService) dbService.removeTrackFromPlaylist(playlistTrackId);
+  handleIpc(IPC_CHANNELS.DB_ADD_TRACK_TO_PLAYLIST, async (playlistId: number, track: Track) => {
+    if (!dbService) throw new Error('Database tidak tersedia');
+    const result = dbService.addTrackToPlaylist(playlistId, track);
+    broadcastLibrary({ type: 'playlist_tracks_changed', playlistId });
+    return result;
+  });
+
+  handleIpc(IPC_CHANNELS.DB_REMOVE_TRACK_FROM_PLAYLIST, async (playlistTrackId: number, playlistId?: number) => {
+    if (!dbService) return;
+    dbService.removeTrackFromPlaylist(playlistTrackId);
+    broadcastLibrary({ type: 'playlist_tracks_changed', playlistId: playlistId || 0 });
+  });
+
+  handleIpc(IPC_CHANNELS.DB_REORDER_PLAYLIST_TRACKS, async (playlistId: number, trackIdsInOrder: number[]) => {
+    if (!dbService) throw new Error('Database tidak tersedia');
+    dbService.reorderPlaylistTracks(playlistId, trackIdsInOrder);
+    broadcastLibrary({ type: 'playlist_tracks_changed', playlistId });
   });
 
   handleIpc(IPC_CHANNELS.DB_DELETE_PLAYLIST, async (playlistId: number) => {
-    if (dbService) dbService.deletePlaylist(playlistId);
+    if (!dbService) return;
+    dbService.deletePlaylist(playlistId);
+    broadcastLibrary({ type: 'playlist_deleted', playlistId });
   });
 }

@@ -177,4 +177,27 @@ describe('DatabaseService M2.1: Liked Songs & Playlist Core (F4)', () => {
     expect(updatedList).toHaveLength(1);
     expect(updatedList[0].id).toBe(mockTrack2.id);
   });
+
+  it('aturan F4: mengubah nama playlist (rename) dan mengurutkan ulang lagu (reorder)', () => {
+    const playlist = dbService.createPlaylist('Playlist Awal');
+    const res1 = dbService.addTrackToPlaylist(playlist.id, mockTrack1);
+    const res2 = dbService.addTrackToPlaylist(playlist.id, mockTrack2);
+
+    // 1. Rename playlist
+    dbService.renamePlaylist(playlist.id, 'Playlist Baru Diubah');
+    const renamed = dbService.getPlaylist(playlist.id);
+    expect(renamed?.name).toBe('Playlist Baru Diubah');
+
+    // Rename nama kosong harus throw
+    expect(() => dbService.renamePlaylist(playlist.id, '   ')).toThrow('Nama playlist wajib diisi');
+
+    // 2. Reorder lagu: tukar posisi trek 2 dan trek 1
+    dbService.reorderPlaylistTracks(playlist.id, [res2.playlistTrackId, res1.playlistTrackId]);
+    const reordered = dbService.getPlaylist(playlist.id);
+    expect(reordered?.tracks).toHaveLength(2);
+    expect(reordered?.tracks[0].playlistTrackId).toBe(res2.playlistTrackId);
+    expect(reordered?.tracks[0].position).toBe(1);
+    expect(reordered?.tracks[1].playlistTrackId).toBe(res1.playlistTrackId);
+    expect(reordered?.tracks[1].position).toBe(2);
+  });
 });

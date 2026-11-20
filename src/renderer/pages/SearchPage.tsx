@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigation } from '../contexts/NavigationContext';
 import { usePlayer } from '../contexts/PlayerContext';
+import { useLibrary } from '../contexts/LibraryContext';
 import { BoundedSearchCache, SearchCoordinator } from '../utils/searchManager';
 import { ID_STRINGS } from '../../shared/i18n/id';
 import { AddToPlaylistModal } from '../components/PlaylistModal';
@@ -14,11 +15,13 @@ interface TrackRowItemProps {
   idx: number;
   isCurrent: boolean;
   isLoading: boolean;
+  isLiked: boolean;
   onPlay: () => void;
   onAddToPlaylist: () => void;
+  onToggleLike: () => void;
 }
 
-const TrackRowItem = React.memo<TrackRowItemProps>(({ track, idx, isCurrent, isLoading, onPlay, onAddToPlaylist }) => {
+const TrackRowItem = React.memo<TrackRowItemProps>(({ track, idx, isCurrent, isLoading, isLiked, onPlay, onAddToPlaylist, onToggleLike }) => {
   return (
     <div
       className="track-row-item"
@@ -103,6 +106,26 @@ const TrackRowItem = React.memo<TrackRowItemProps>(({ track, idx, isCurrent, isL
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
         <button
+          className="btn-track-like"
+          title={isLiked ? 'Hapus dari Lagu Disukai' : 'Suka lagu ini'}
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleLike();
+          }}
+          style={{
+            background: 'none',
+            border: 'none',
+            fontSize: '14px',
+            color: isLiked ? '#e2264d' : '#888888',
+            cursor: 'pointer',
+            padding: '4px',
+            transition: 'color 0.15s, transform 0.1s',
+          }}
+        >
+          {isLiked ? '❤️' : '🤍'}
+        </button>
+
+        <button
           title="Tambah ke Playlist"
           onClick={(e) => {
             e.stopPropagation();
@@ -132,6 +155,7 @@ const TrackRowItem = React.memo<TrackRowItemProps>(({ track, idx, isCurrent, isL
 export const SearchPage: React.FC = () => {
   const { searchQuery, setSearchQuery, navigateToArtist, navigateToAlbum } = useNavigation();
   const { setQueue, state: playerState } = usePlayer();
+  const { isLiked, toggleLike } = useLibrary();
 
   const [inputVal, setInputVal] = useState<string>(searchQuery);
   const [results, setResults] = useState<SearchResult | null>(null);
@@ -466,8 +490,10 @@ export const SearchPage: React.FC = () => {
                     idx={idx}
                     isCurrent={playerState.currentTrack?.id === track.id}
                     isLoading={playerState.status === 'loading' && playerState.currentTrack?.id === track.id}
+                    isLiked={isLiked(track.id)}
                     onPlay={() => handleTrackClick(track, idx)}
                     onAddToPlaylist={() => setModalTrack(track)}
+                    onToggleLike={() => toggleLike(track)}
                   />
                 ))}
               </div>

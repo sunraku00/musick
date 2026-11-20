@@ -290,22 +290,46 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
   }, [machine]);
 
-  // Prefetch stream lagu berikutnya di antrean saat lagu sekarang memutar (Tambahan B3)
+  // Prefetch stream lagu berikutnya di antrean saat lagu sekarang memutar (Tambahan B3 & Guardrails)
   const prefetchedTrackIdRef = useRef<string | null>(null);
+  const pausedTimestampRef = useRef<number | null>(null);
+
   useEffect(() => {
-    if (state.status === 'playing' && state.currentTrack && state.queue.length > 0) {
-      const nextIndex = state.currentIndex + 1;
-      if (nextIndex < state.queue.length) {
-        const nextTrack = state.queue[nextIndex];
-        const nextId = nextTrack.sourceId || nextTrack.id;
-        if (nextId && prefetchedTrackIdRef.current !== nextId) {
-          prefetchedTrackIdRef.current = nextId;
-          // Prefetch satu lagu ke depan di latar belakang ke memory cache
-          window.musicApi?.resolveStream(nextId).catch(() => {});
-        }
+    if (state.status === 'paused') {
+      if (!pausedTimestampRef.current) {
+        pausedTimestampRef.current = Date.now();
       }
+    } else if (state.status === 'playing') {
+      pausedTimestampRef.current = null;
     }
-  }, [state.currentTrack?.id, state.status, state.currentIndex, state.queue]);
+  }, [state.status]);
+
+  useEffect(() => {
+    // Guardrails prefetch:
+    // 1. Hanya prefetch bila sedang aktif memutar ('playing')
+    // 2. Berhenti dan jangan prefetch jika terjadi pembatasan sumber (BLOCKED / RATE_LIMITED)
+    // 3. Berhenti di ujung antrean (currentIndex >= queue.length - 1)
+    // 4. Tidak melakukan prefetch saat jeda lama (> 30s) atau status bukan playing
+    if (state.status !== 'playing') return;
+    if (state.error?.code === 'BLOCKED' || state.error?.code === 'RATE_LIMITED') return;
+    if (!state.currentTrack || state.queue.length === 0) return;
+
+    const nextIndex = state.currentIndex + 1;
+    if (nextIndex >= state.queue.length) {
+      // Ujung antrean: tidak ada lagu berikutnya untuk diprefetch
+      return;
+    }
+
+    const nextTrack = state.queue[nextIndex];
+    const nextId = nextTrack.sourceId || nextTrack.id;
+    if (nextId && prefetchedTrackIdRef.current !== nextId) {
+      prefetchedTrackIdRef.current = nextId;
+      // Prefetch satu lagu ke depan di latar belakang ke memory cache
+      window.musicApi?.resolveStream(nextId).catch((err) => {
+        console.warn('[PlayerContext] Prefetch stream gagal diabaikan:', err);
+      });
+    }
+  }, [state.currentTrack?.id, state.status, state.currentIndex, state.queue, state.error?.code]);
 
   // Persistensi otomatis status pemutar ke SQLite
   useEffect(() => {

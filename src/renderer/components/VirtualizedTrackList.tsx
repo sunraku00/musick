@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import type { Track } from '../../shared/types';
+import { useLibrary } from '../contexts/LibraryContext';
 
 interface VirtualizedTrackListProps {
   tracks: readonly Track[];
@@ -16,6 +17,7 @@ export const VirtualizedTrackList: React.FC<VirtualizedTrackListProps> = ({
   itemHeight = 56,
   viewportHeight = 400,
 }) => {
+  const { isLiked, toggleLike } = useLibrary();
   const containerRef = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
 
@@ -99,6 +101,10 @@ export const VirtualizedTrackList: React.FC<VirtualizedTrackListProps> = ({
                   <img
                     src={track.coverUrl}
                     alt={track.title}
+                    loading="lazy"
+                    decoding="async"
+                    width={40}
+                    height={40}
                     style={{ width: '40px', height: '40px', borderRadius: '4px', objectFit: 'cover' }}
                   />
                 ) : (
@@ -146,9 +152,29 @@ export const VirtualizedTrackList: React.FC<VirtualizedTrackListProps> = ({
                 </div>
               </div>
 
-              <span style={{ fontSize: '12px', color: '#b3b3b3', marginLeft: '12px' }}>
-                {formatDuration(track.durationSec)}
-              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <button
+                  className="btn-track-like"
+                  title={isLiked(track.id) ? 'Hapus dari Lagu Disukai' : 'Suka lagu ini'}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleLike(track);
+                  }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    fontSize: '14px',
+                    color: isLiked(track.id) ? '#e2264d' : '#888888',
+                    cursor: 'pointer',
+                    padding: '4px',
+                  }}
+                >
+                  {isLiked(track.id) ? '❤️' : '🤍'}
+                </button>
+                <span style={{ fontSize: '12px', color: '#b3b3b3', marginLeft: '6px' }}>
+                  {formatDuration(track.durationSec)}
+                </span>
+              </div>
             </div>
           );
         })}

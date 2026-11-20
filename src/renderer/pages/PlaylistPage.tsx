@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import type { PlaylistDetails } from '../../shared/types';
 import { useNavigation } from '../contexts/NavigationContext';
 import { usePlayer } from '../contexts/PlayerContext';
+import { useLibrary } from '../contexts/LibraryContext';
 
 function formatDuration(sec?: number): string {
   if (!sec || isNaN(sec)) return '--:--';
@@ -11,34 +11,25 @@ function formatDuration(sec?: number): string {
 }
 
 export const PlaylistPage: React.FC = () => {
-  const { selectedPlaylistId, navigateTo, triggerPlaylistRefresh, playlistRefreshKey } = useNavigation();
+  const { selectedPlaylistId, navigateTo } = useNavigation();
   const { playTrack, showToast, state: playerState } = usePlayer();
-  const [playlist, setPlaylist] = useState<PlaylistDetails | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  const loadPlaylist = async () => {
-    if (!selectedPlaylistId) return;
-    try {
-      setIsLoading(true);
-      const data = await window.musicApi.dbGetPlaylist(selectedPlaylistId);
-      setPlaylist(data);
-    } catch (err) {
-      console.error('Gagal memuat detail playlist:', err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const { activePlaylist: playlist, loadActivePlaylist, deletePlaylist, renamePlaylist, removeTrackFromPlaylist, reorderPlaylistTracks } = useLibrary();
+  const [isLoading, setIsLoading] = useState(false);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editNameVal, setEditNameVal] = useState('');
 
   useEffect(() => {
-    loadPlaylist();
-  }, [selectedPlaylistId, playlistRefreshKey]);
+    if (selectedPlaylistId) {
+      setIsLoading(true);
+      loadActivePlaylist(selectedPlaylistId).finally(() => setIsLoading(false));
+    }
+  }, [selectedPlaylistId, loadActivePlaylist]);
 
   const handleDeletePlaylist = async () => {
     if (!playlist) return;
     if (window.confirm(`Yakin ingin menghapus playlist "${playlist.name}"? Lagu di database tidak akan terhapus.`)) {
       try {
-        await window.musicApi.dbDeletePlaylist(playlist.id);
-        triggerPlaylistRefresh();
+        await deletePlaylist(playlist.id);
         showToast(`Playlist "${playlist.name}" dihapus`);
         navigateTo('home');
       } catch (err) {
@@ -47,15 +38,53 @@ export const PlaylistPage: React.FC = () => {
     }
   };
 
+  const handleStartRename = () => {
+    if (!playlist) return;
+    setEditNameVal(playlist.name);
+    setIsEditingName(true);
+  };
+
+  const handleSaveRename = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!playlist) return;
+    const clean = editNameVal.trim().slice(0, 100);
+    if (!clean) return;
+    try {
+      await renamePlaylist(playlist.id, clean);
+      setIsEditingName(false);
+      showToast('Nama playlist diperbarui');
+    } catch (err) {
+      console.error('Gagal mengubah nama playlist:', err);
+    }
+  };
+
   const handleRemoveTrack = async (playlistTrackId: number, e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!playlist) return;
     try {
-      await window.musicApi.dbRemoveTrackFromPlaylist(playlistTrackId);
-      triggerPlaylistRefresh();
+      await removeTrackFromPlaylist(playlist.id, playlistTrackId);
       showToast('Lagu dihapus dari playlist');
-      loadPlaylist();
     } catch (err) {
       console.error('Gagal menghapus trek:', err);
+    }
+  };
+
+  const handleMoveTrack = async (index: number, direction: 'up' | 'down', e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!playlist || playlist.tracks.length < 2) return;
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= playlist.tracks.length) return;
+
+    const newTracks = [...playlist.tracks];
+    const [moved] = newTracks.splice(index, 1);
+    newTracks.splice(targetIndex, 0, moved);
+
+    const orderedIds = newTracks.map((t) => t.playlistTrackId);
+    try {
+      await reorderPlaylistTracks(playlist.id, orderedIds);
+      showToast('Urutan lagu diperbarui');
+    } catch (err) {
+      console.error('Gagal mengurutkan lagu:', err);
     }
   };
 
@@ -69,7 +98,16 @@ export const PlaylistPage: React.FC = () => {
         <h3>Playlist tidak ditemukan</h3>
         <button
           onClick={() => navigateTo('home')}
-          style={{ marginTop: '16px', padding: '8px 16px', backgroundColor: '#333', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+          style={{
+            marginTop: '16px',
+            padding: '8px 16px',
+            backgroundColor: '#1db954',
+            color: '#000',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontWeight: 600,
+          }}
         >
           Kembali ke Beranda
         </button>
@@ -100,16 +138,84 @@ export const PlaylistPage: React.FC = () => {
           <div style={{ fontSize: '13px', fontWeight: 600, color: '#b3b3b3', textTransform: 'uppercase' }}>
             Playlist Lokal
           </div>
-          <h1 id="playlist-title" style={{ fontSize: '32px', fontWeight: 800, margin: '4px 0 8px 0', color: '#ffffff' }}>
-            {playlist.name}
-          </h1>
+          {isEditingName ? (
+            <form onSubmit={handleSaveRename} style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '4px 0 8px 0' }}>
+              <input
+                id="input-rename-playlist"
+                type="text"
+                value={editNameVal}
+                onChange={(e) => setEditNameVal(e.target.value)}
+                maxLength={100}
+                autoFocus
+                style={{
+                  fontSize: '20px',
+                  fontWeight: 700,
+                  backgroundColor: '#282828',
+                  color: '#ffffff',
+                  border: '1px solid #1db954',
+                  borderRadius: '4px',
+                  padding: '4px 8px',
+                }}
+              />
+              <button
+                id="btn-save-rename"
+                type="submit"
+                style={{
+                  backgroundColor: '#1db954',
+                  color: '#000',
+                  border: 'none',
+                  padding: '6px 12px',
+                  borderRadius: '4px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Simpan
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsEditingName(false)}
+                style={{
+                  backgroundColor: 'transparent',
+                  color: '#888',
+                  border: '1px solid #444',
+                  padding: '6px 10px',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                }}
+              >
+                Batal
+              </button>
+            </form>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '4px 0 8px 0' }}>
+              <h1 id="playlist-title" style={{ fontSize: '32px', fontWeight: 800, margin: 0, color: '#ffffff' }}>
+                {playlist.name}
+              </h1>
+              <button
+                id="btn-rename-playlist"
+                title="Ubah nama playlist"
+                onClick={handleStartRename}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#888888',
+                  fontSize: '14px',
+                  cursor: 'pointer',
+                  padding: '4px',
+                }}
+              >
+                ✏️
+              </button>
+            </div>
+          )}
           {playlist.description && (
             <p id="playlist-desc" style={{ fontSize: '13px', color: '#b3b3b3', margin: '0 0 10px 0', lineHeight: '1.4' }}>
               {playlist.description}
             </p>
           )}
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '13px', color: '#888888' }}>
-            <span>{playlist.trackCount} lagu</span>
+            <span id="playlist-track-count">{playlist.trackCount} lagu</span>
             <span>•</span>
             <button
               id="btn-delete-playlist"
@@ -140,13 +246,14 @@ export const PlaylistPage: React.FC = () => {
           </p>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          {playlist.tracks.map((track) => {
+        <div id="playlist-track-list" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          {playlist.tracks.map((track, idx) => {
             const isCurrent = playerState.currentTrack?.id === track.id;
             const isTrackLoading = isCurrent && playerState.status === 'loading';
             return (
               <div
                 key={track.playlistTrackId}
+                data-playlist-track-id={track.playlistTrackId}
                 className="track-row"
                 onClick={() => playTrack(track, playlist.tracks)}
                 style={{
@@ -195,29 +302,65 @@ export const PlaylistPage: React.FC = () => {
                   </div>
                 </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                <button
-                  title="Hapus dari playlist ini"
-                  onClick={(e) => handleRemoveTrack(track.playlistTrackId, e)}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    fontSize: '14px',
-                    color: '#888',
-                    cursor: 'pointer',
-                    padding: '4px',
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.color = '#ff6b6b')}
-                  onMouseLeave={(e) => (e.currentTarget.style.color = '#888')}
-                >
-                  ✕
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {/* Reorder Buttons */}
+                  <button
+                    className="btn-move-track-up"
+                    title="Pindahkan ke atas"
+                    disabled={idx === 0}
+                    onClick={(e) => handleMoveTrack(idx, 'up', e)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      fontSize: '11px',
+                      color: idx === 0 ? '#444' : '#888',
+                      cursor: idx === 0 ? 'default' : 'pointer',
+                      padding: '2px 4px',
+                    }}
+                  >
+                    ▲
+                  </button>
+                  <button
+                    className="btn-move-track-down"
+                    title="Pindahkan ke bawah"
+                    disabled={idx === playlist.tracks.length - 1}
+                    onClick={(e) => handleMoveTrack(idx, 'down', e)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      fontSize: '11px',
+                      color: idx === playlist.tracks.length - 1 ? '#444' : '#888',
+                      cursor: idx === playlist.tracks.length - 1 ? 'default' : 'pointer',
+                      padding: '2px 4px',
+                    }}
+                  >
+                    ▼
+                  </button>
 
-                <div style={{ width: '45px', textAlign: 'right', fontSize: '12px', color: '#777777' }}>
-                  {formatDuration(track.durationSec)}
+                  {/* Remove Track Button */}
+                  <button
+                    className="btn-remove-track"
+                    title="Hapus dari playlist ini"
+                    onClick={(e) => handleRemoveTrack(track.playlistTrackId, e)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      fontSize: '14px',
+                      color: '#888',
+                      cursor: 'pointer',
+                      padding: '4px',
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.color = '#ff6b6b')}
+                    onMouseLeave={(e) => (e.currentTarget.style.color = '#888')}
+                  >
+                    ✕
+                  </button>
+
+                  <div style={{ width: '45px', textAlign: 'right', fontSize: '12px', color: '#777777' }}>
+                    {formatDuration(track.durationSec)}
+                  </div>
                 </div>
               </div>
-            </div>
             );
           })}
         </div>

@@ -30,7 +30,17 @@ export const IPC_CHANNELS = {
   DB_ADD_TRACK_TO_PLAYLIST: 'db:add-track-to-playlist',
   DB_REMOVE_TRACK_FROM_PLAYLIST: 'db:remove-track-from-playlist',
   DB_DELETE_PLAYLIST: 'db:delete-playlist',
+  DB_RENAME_PLAYLIST: 'db:rename-playlist',
+  DB_REORDER_PLAYLIST_TRACKS: 'db:reorder-playlist-tracks',
+  LIBRARY_CHANGED: 'library:changed',
 } as const;
+
+export type LibraryChangeEvent =
+  | { type: 'like'; trackId: string; isLiked: boolean; track?: Track }
+  | { type: 'playlist_created'; playlist: Playlist }
+  | { type: 'playlist_renamed'; playlistId: number; name: string }
+  | { type: 'playlist_deleted'; playlistId: number }
+  | { type: 'playlist_tracks_changed'; playlistId: number };
 
 export interface PowerBlockerStatus {
   readonly active: boolean;
@@ -86,6 +96,9 @@ export interface MusicApi {
   dbAddTrackToPlaylist(playlistId: number, track: Track): Promise<{ added: boolean; isDuplicate: boolean; playlistTrackId: number }>;
   dbRemoveTrackFromPlaylist(playlistTrackId: number): Promise<void>;
   dbDeletePlaylist(playlistId: number): Promise<void>;
+  dbRenamePlaylist(playlistId: number, name: string): Promise<void>;
+  dbReorderPlaylistTracks(playlistId: number, trackIdsInOrder: number[]): Promise<void>;
+  onLibraryChanged(callback: (event: LibraryChangeEvent) => void): () => void;
   onSuspend(callback: () => void): () => void;
   onResume(callback: () => void): () => void;
 }

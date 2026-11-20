@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigation } from '../contexts/NavigationContext';
 import { usePlayer } from '../contexts/PlayerContext';
+import { useLibrary } from '../contexts/LibraryContext';
 import type { Artist, Track } from '../../shared/types';
 import { ID_STRINGS } from '../../shared/i18n/id';
 
 export const ArtistPage: React.FC = () => {
   const { selectedArtistId, navigateToAlbum, navigateTo } = useNavigation();
   const { setQueue, state: playerState } = usePlayer();
+  const { isLiked, toggleLike } = useLibrary();
 
   const [artist, setArtist] = useState<Artist | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -200,9 +202,30 @@ export const ArtistPage: React.FC = () => {
                     </div>
                   </div>
 
-                  <span style={{ fontSize: '12px', color: '#888888' }}>
-                    {track.durationSec ? `${Math.floor(track.durationSec / 60)}:${(track.durationSec % 60).toString().padStart(2, '0')}` : '--:--'}
-                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <button
+                      className="btn-track-like"
+                      title={isLiked(track.id) ? 'Hapus dari Lagu Disukai' : 'Sukai lagu ini'}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleLike(track as Track);
+                      }}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontSize: '16px',
+                        padding: '4px',
+                        color: isLiked(track.id) ? '#1db954' : '#b3b3b3',
+                        lineHeight: 1,
+                      }}
+                    >
+                      {isLiked(track.id) ? '💚' : '🤍'}
+                    </button>
+                    <span style={{ fontSize: '12px', color: '#888888' }}>
+                      {track.durationSec ? `${Math.floor(track.durationSec / 60)}:${(track.durationSec % 60).toString().padStart(2, '0')}` : '--:--'}
+                    </span>
+                  </div>
                 </div>
               );
             })}

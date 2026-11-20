@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import type { Playlist, Track } from '../../shared/types';
+import { useLibrary } from '../contexts/LibraryContext';
 
 interface CreatePlaylistModalProps {
   isOpen: boolean;
@@ -8,6 +9,7 @@ interface CreatePlaylistModalProps {
 }
 
 export const CreatePlaylistModal: React.FC<CreatePlaylistModalProps> = ({ isOpen, onClose, onCreated }) => {
+  const { createPlaylist } = useLibrary();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -26,7 +28,7 @@ export const CreatePlaylistModal: React.FC<CreatePlaylistModalProps> = ({ isOpen
     try {
       setIsSubmitting(true);
       setError(null);
-      const newPlaylist = await window.musicApi.dbCreatePlaylist(cleanName.slice(0, 100), description.trim().slice(0, 300));
+      const newPlaylist = await createPlaylist(cleanName.slice(0, 100), description.trim().slice(0, 300));
       setName('');
       setDescription('');
       onCreated(newPlaylist);
@@ -192,26 +194,15 @@ interface AddToPlaylistModalProps {
 }
 
 export const AddToPlaylistModal: React.FC<AddToPlaylistModalProps> = ({ track, isOpen, onClose, onSuccess }) => {
-  const [playlists, setPlaylists] = useState<Playlist[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const { playlists, addTrackToPlaylist, createPlaylist } = useLibrary();
   const [isCreating, setIsCreating] = useState(false);
   const [newPlaylistName, setNewPlaylistName] = useState('');
-
-  useEffect(() => {
-    if (isOpen) {
-      setIsLoading(true);
-      window.musicApi.dbGetPlaylists().then((list) => {
-        setPlaylists(list || []);
-        setIsLoading(false);
-      }).catch(() => setIsLoading(false));
-    }
-  }, [isOpen]);
 
   if (!isOpen || !track) return null;
 
   const handleSelect = async (p: Playlist) => {
     try {
-      const res = await window.musicApi.dbAddTrackToPlaylist(p.id, track);
+      const res = await addTrackToPlaylist(p.id, track);
       onSuccess(p.name, res.isDuplicate);
       onClose();
     } catch (err) {
@@ -225,8 +216,8 @@ export const AddToPlaylistModal: React.FC<AddToPlaylistModalProps> = ({ track, i
     if (!cleanName) return;
 
     try {
-      const created = await window.musicApi.dbCreatePlaylist(cleanName.slice(0, 100));
-      const res = await window.musicApi.dbAddTrackToPlaylist(created.id, track);
+      const created = await createPlaylist(cleanName.slice(0, 100));
+      const res = await addTrackToPlaylist(created.id, track);
       setNewPlaylistName('');
       setIsCreating(false);
       onSuccess(created.name, res.isDuplicate);

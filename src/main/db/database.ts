@@ -547,7 +547,35 @@ export class DatabaseService {
   }
 
   removeTrackFromPlaylist(playlistTrackId: number): void {
+    const row = this.db.prepare('SELECT playlist_id FROM playlist_tracks WHERE id = ?').get(playlistTrackId) as { playlist_id: number } | undefined;
     this.db.prepare('DELETE FROM playlist_tracks WHERE id = ?').run(playlistTrackId);
+    if (row?.playlist_id) {
+      this.db.prepare("UPDATE playlists SET updated_at = datetime('now') WHERE id = ?").run(row.playlist_id);
+    }
+  }
+
+  renamePlaylist(playlistId: number, name: string): void {
+    const cleanName = (name || '').trim();
+    if (!cleanName) {
+      throw new Error('Nama playlist wajib diisi');
+    }
+    const truncatedName = cleanName.slice(0, 100);
+    this.db.prepare("UPDATE playlists SET name = ?, updated_at = datetime('now') WHERE id = ?").run(truncatedName, playlistId);
+  }
+
+  reorderPlaylistTracks(playlistId: number, trackIdsInOrder: number[]): void {
+    const updateStmt = this.db.prepare('UPDATE playlist_tracks SET position = ? WHERE id = ? AND playlist_id = ?');
+    this.db.exec('BEGIN TRANSACTION');
+    try {
+      for (let i = 0; i < trackIdsInOrder.length; i++) {
+        updateStmt.run(i + 1, trackIdsInOrder[i], playlistId);
+      }
+      this.db.prepare("UPDATE playlists SET updated_at = datetime('now') WHERE id = ?").run(playlistId);
+      this.db.exec('COMMIT');
+    } catch (err) {
+      this.db.exec('ROLLBACK');
+      throw err;
+    }
   }
 
   deletePlaylist(playlistId: number): void {

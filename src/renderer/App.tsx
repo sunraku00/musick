@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { NavigationProvider, useNavigation } from './contexts/NavigationContext';
 import { PlayerProvider, usePlayer } from './contexts/PlayerContext';
+import { LibraryProvider } from './contexts/LibraryContext';
 import { Sidebar } from './components/Sidebar';
 import { PlayerBar } from './components/PlayerBar';
 import { HomePage } from './pages/HomePage';
@@ -143,9 +144,11 @@ const AppContent: React.FC = () => {
 export const App: React.FC = () => {
   return (
     <NavigationProvider>
-      <PlayerProvider>
-        <AppContent />
-      </PlayerProvider>
+      <LibraryProvider>
+        <PlayerProvider>
+          <AppContent />
+        </PlayerProvider>
+      </LibraryProvider>
     </NavigationProvider>
   );
 };

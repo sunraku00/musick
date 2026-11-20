@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { usePlayer } from '../contexts/PlayerContext';
+import { useLibrary } from '../contexts/LibraryContext';
 import { ID_STRINGS } from '../../shared/i18n/id';
 import { AddToPlaylistModal } from './PlaylistModal';
 
@@ -12,26 +13,17 @@ function formatTime(seconds: number): string {
 
 export const PlayerBar: React.FC = () => {
   const { state, togglePlay, pause, seek, setVolume, toggleMute, previous, next, retryPlay, showToast } = usePlayer();
+  const { isLiked: checkLiked, toggleLike } = useLibrary();
   const { currentTrack, status, positionSec, durationSec, volume, isMuted, error } = state;
 
-  const [isLiked, setIsLiked] = useState(false);
   const [isPlaylistModalOpen, setIsPlaylistModalOpen] = useState(false);
 
-  useEffect(() => {
-    if (currentTrack) {
-      window.musicApi.dbIsTrackLiked(currentTrack.id).then((liked) => {
-        setIsLiked(liked);
-      }).catch(() => setIsLiked(false));
-    } else {
-      setIsLiked(false);
-    }
-  }, [currentTrack]);
+  const isCurrentTrackLiked = currentTrack ? checkLiked(currentTrack.id) : false;
 
   const handleToggleLike = async () => {
     if (!currentTrack) return;
     try {
-      const nowLiked = await window.musicApi.dbToggleLikeTrack(currentTrack);
-      setIsLiked(nowLiked);
+      const nowLiked = await toggleLike(currentTrack);
       showToast(nowLiked ? 'Disimpan ke Lagu yang Disukai' : 'Dihapus dari Lagu yang Disukai');
     } catch (err) {
       console.error('Gagal toggle like:', err);
@@ -150,19 +142,19 @@ export const PlayerBar: React.FC = () => {
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <button
               id="btn-toggle-like"
-              title={isLiked ? 'Hapus dari Lagu Disukai' : 'Suka lagu ini'}
+              title={isCurrentTrackLiked ? 'Hapus dari Lagu Disukai' : 'Suka lagu ini'}
               onClick={handleToggleLike}
               style={{
                 background: 'none',
                 border: 'none',
-                color: isLiked ? '#e2264d' : '#888888',
+                color: isCurrentTrackLiked ? '#e2264d' : '#888888',
                 fontSize: '16px',
                 cursor: 'pointer',
                 padding: '4px',
                 transition: 'transform 0.1s, color 0.15s',
               }}
             >
-              {isLiked ? '❤️' : '🤍'}
+              {isCurrentTrackLiked ? '❤️' : '🤍'}
             </button>
 
             <button

@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import type { Track } from '../../shared/types';
 import { usePlayer } from '../contexts/PlayerContext';
+import { useLibrary } from '../contexts/LibraryContext';
 import { AddToPlaylistModal } from '../components/PlaylistModal';
 
 function formatDuration(sec?: number): string {
@@ -11,32 +12,14 @@ function formatDuration(sec?: number): string {
 }
 
 export const LikedSongsPage: React.FC = () => {
-  const [tracks, setTracks] = useState<Track[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { likedTracks: tracks, toggleLike, isLoading } = useLibrary();
   const [modalTrack, setModalTrack] = useState<Track | null>(null);
   const { playTrack, showToast, state: playerState } = usePlayer();
-
-  const loadLikedTracks = async () => {
-    try {
-      setIsLoading(true);
-      const list = await window.musicApi.dbGetLikedTracks();
-      setTracks(list || []);
-    } catch (err) {
-      console.error('Gagal memuat lagu disukai:', err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadLikedTracks();
-  }, []);
 
   const handleUnlike = async (track: Track, e: React.MouseEvent) => {
     e.stopPropagation();
     try {
-      await window.musicApi.dbToggleLikeTrack(track);
-      setTracks((prev) => prev.filter((t) => t.id !== track.id));
+      await toggleLike(track);
       showToast('Dihapus dari Lagu yang Disukai');
     } catch (err) {
       console.error('Gagal mengubah status like:', err);

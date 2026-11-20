@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { MusicSourceError, type MusicSourceErrorPayload } from '../shared/errors';
-import { IPC_CHANNELS, type AppInfo, type ClearHistoryResult, type MusicApi, type PowerBlockerStatus, type SavedPlayback } from '../shared/ipc';
+import { IPC_CHANNELS, type AppInfo, type ClearHistoryResult, type LibraryChangeEvent, type MusicApi, type PowerBlockerStatus, type SavedPlayback } from '../shared/ipc';
 import type { Album, Artist, Playlist, PlaylistDetails, SearchResult, SourceMeta, StreamInfo, Track } from '../shared/types';
 
 interface IpcResult<T> {
@@ -107,6 +107,17 @@ const api: MusicApi = {
   },
   dbDeletePlaylist: (playlistId: number): Promise<void> => {
     return invokeIpc<void>(IPC_CHANNELS.DB_DELETE_PLAYLIST, playlistId);
+  },
+  dbRenamePlaylist: (playlistId: number, name: string): Promise<void> => {
+    return invokeIpc<void>(IPC_CHANNELS.DB_RENAME_PLAYLIST, playlistId, name);
+  },
+  dbReorderPlaylistTracks: (playlistId: number, trackIdsInOrder: number[]): Promise<void> => {
+    return invokeIpc<void>(IPC_CHANNELS.DB_REORDER_PLAYLIST_TRACKS, playlistId, trackIdsInOrder);
+  },
+  onLibraryChanged: (callback: (event: LibraryChangeEvent) => void): (() => void) => {
+    const handler = (_e: unknown, event: LibraryChangeEvent) => callback(event);
+    ipcRenderer.on(IPC_CHANNELS.LIBRARY_CHANGED, handler);
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.LIBRARY_CHANGED, handler);
   },
   onSuspend: (callback: () => void): (() => void) => {
     const handler = () => callback();

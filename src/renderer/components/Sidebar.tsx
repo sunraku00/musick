@@ -1,31 +1,18 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigation, type PageId } from '../contexts/NavigationContext';
+import { useLibrary } from '../contexts/LibraryContext';
 import { ID_STRINGS } from '../../shared/i18n/id';
-import type { Playlist } from '../../shared/types';
 import { CreatePlaylistModal } from './PlaylistModal';
 
 export const Sidebar: React.FC = () => {
-  const { currentPage, navigateTo, selectedPlaylistId, navigateToPlaylist, playlistRefreshKey, triggerPlaylistRefresh } = useNavigation();
-  const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const { currentPage, navigateTo, selectedPlaylistId, navigateToPlaylist } = useNavigation();
+  const { playlists, likedTracks } = useLibrary();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
-  const loadPlaylists = async () => {
-    try {
-      const list = await window.musicApi.dbGetPlaylists();
-      setPlaylists(list || []);
-    } catch (err) {
-      console.error('Gagal memuat daftar playlist:', err);
-    }
-  };
-
-  useEffect(() => {
-    loadPlaylists();
-  }, [playlistRefreshKey]);
-
-  const navItems: { id: PageId; label: string; icon: string }[] = [
+  const navItems: { id: PageId; label: string; icon: string; count?: number }[] = [
     { id: 'home', label: ID_STRINGS.nav.home, icon: '🏠' },
     { id: 'search', label: ID_STRINGS.nav.search, icon: '🔍' },
-    { id: 'liked-songs', label: 'Lagu Disukai', icon: '❤️' },
+    { id: 'liked-songs', label: 'Lagu Disukai', icon: '❤️', count: likedTracks.length },
     { id: 'settings', label: ID_STRINGS.nav.settings, icon: '⚙️' },
   ];
 
@@ -61,7 +48,7 @@ export const Sidebar: React.FC = () => {
           <h1 style={{ fontSize: '18px', fontWeight: 'bold', margin: 0, color: '#ffffff' }}>
             {ID_STRINGS.app.title}
           </h1>
-          <span style={{ fontSize: '11px', color: '#b3b3b3' }}>v0.2.0</span>
+          <span style={{ fontSize: '11px', color: '#b3b3b3' }}>v0.2.2</span>
         </div>
       </div>
 
@@ -102,7 +89,12 @@ export const Sidebar: React.FC = () => {
               }}
             >
               <span style={{ fontSize: '16px' }}>{item.icon}</span>
-              <span>{item.label}</span>
+              <span style={{ flex: 1 }}>{item.label}</span>
+              {item.count !== undefined && item.count > 0 && (
+                <span id={`nav-${item.id}-count`} style={{ fontSize: '11px', color: '#888888' }}>
+                  {item.count}
+                </span>
+              )}
             </button>
           );
         })}
@@ -194,7 +186,6 @@ export const Sidebar: React.FC = () => {
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
         onCreated={(newP) => {
-          triggerPlaylistRefresh();
           navigateToPlaylist(newP.id);
         }}
       />
