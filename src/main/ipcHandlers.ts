@@ -80,7 +80,9 @@ export class SourceManager {
 
 export function registerIpcHandlers(
   sourceManager: SourceManager,
-  dbService?: DatabaseService
+  dbService?: DatabaseService,
+  updateBlocker?: (isPlaying: boolean) => { active: boolean; blockerId: number | null; settingEnabled: boolean },
+  getBlockerStatus?: () => { active: boolean; blockerId: number | null; settingEnabled: boolean }
 ): void {
   // Helper pembungkus untuk serialisasi error IPC
   const handleIpc = <TArgs extends unknown[], TReturn>(
@@ -138,11 +140,11 @@ export function registerIpcHandlers(
   });
 
   handleIpc(IPC_CHANNELS.GET_APP_INFO, async (): Promise<AppInfo> => {
-    let ver = '0.1.2';
+    let ver = '0.1.3';
     try {
       ver = app.getVersion();
     } catch {
-      ver = '0.1.2';
+      ver = '0.1.3';
     }
     return {
       version: ver,
@@ -157,6 +159,9 @@ export function registerIpcHandlers(
 
   handleIpc(IPC_CHANNELS.DB_SET_SETTING, async (key: string, value: string) => {
     if (dbService) dbService.setSetting(key, value);
+    if (key === 'keepPlayingOnScreenOff' && updateBlocker) {
+      updateBlocker(undefined as any);
+    }
   });
 
   handleIpc(IPC_CHANNELS.DB_SAVE_PLAYBACK, async (state: SavedPlayback) => {
@@ -185,5 +190,18 @@ export function registerIpcHandlers(
 
   handleIpc(IPC_CHANNELS.DB_CLEAR_ALL_HISTORY, async () => {
     return dbService ? dbService.clearAllHistory() : { playbackCleared: 0, searchCleared: 0 };
+  });
+
+  handleIpc(IPC_CHANNELS.POWER_SET_PLAYBACK_ACTIVE, async (isPlaying: boolean) => {
+    if (updateBlocker) {
+      updateBlocker(isPlaying);
+    }
+  });
+
+  handleIpc(IPC_CHANNELS.POWER_GET_BLOCKER_STATUS, async () => {
+    if (getBlockerStatus) {
+      return getBlockerStatus();
+    }
+    return { active: false, blockerId: null, settingEnabled: true };
   });
 }

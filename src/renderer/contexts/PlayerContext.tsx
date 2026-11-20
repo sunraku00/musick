@@ -189,6 +189,11 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       if (event.type === 'STATE_CHANGED') {
         setState(event.state);
 
+        // Beri tahu main process untuk mengaktifkan/menonaktifkan powerSaveBlocker (layar mati)
+        if (window.musicApi?.setPowerSaveBlocker) {
+          window.musicApi.setPowerSaveBlocker(event.state.status === 'playing').catch(() => {});
+        }
+
         // Sinkronisasi status audio DOM dengan state machine
         if (audioRef.current) {
           const domAudio = audioRef.current;
@@ -255,6 +260,9 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       unsubscribe();
       if (cleanSuspend) cleanSuspend();
       if (cleanResume) cleanResume();
+      if (window.musicApi?.setPowerSaveBlocker) {
+        window.musicApi.setPowerSaveBlocker(false).catch(() => {});
+      }
       if (handleDeviceChange && typeof navigator !== 'undefined' && navigator.mediaDevices) {
         navigator.mediaDevices.removeEventListener('devicechange', handleDeviceChange);
       }

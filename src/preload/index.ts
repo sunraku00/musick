@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { MusicSourceError, type MusicSourceErrorPayload } from '../shared/errors';
-import { IPC_CHANNELS, type AppInfo, type ClearHistoryResult, type MusicApi, type SavedPlayback } from '../shared/ipc';
+import { IPC_CHANNELS, type AppInfo, type ClearHistoryResult, type MusicApi, type PowerBlockerStatus, type SavedPlayback } from '../shared/ipc';
 import type { Album, Artist, SearchResult, SourceMeta, StreamInfo, Track } from '../shared/types';
 
 interface IpcResult<T> {
@@ -74,6 +74,12 @@ const api: MusicApi = {
   },
   dbClearAllHistory: (): Promise<ClearHistoryResult> => {
     return invokeIpc<ClearHistoryResult>(IPC_CHANNELS.DB_CLEAR_ALL_HISTORY);
+  },
+  setPowerSaveBlocker: (isPlaying: boolean): Promise<void> => {
+    return invokeIpc<void>(IPC_CHANNELS.POWER_SET_PLAYBACK_ACTIVE, isPlaying);
+  },
+  getPowerSaveBlockerStatus: (): Promise<PowerBlockerStatus> => {
+    return invokeIpc<PowerBlockerStatus>(IPC_CHANNELS.POWER_GET_BLOCKER_STATUS);
   },
   onSuspend: (callback: () => void): (() => void) => {
     const handler = () => callback();

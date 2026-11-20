@@ -53,7 +53,7 @@ Dokumen ini berisi panduan dan daftar periksa pengujian manual (*manual acceptan
 | # | Skenario Uji | Langkah Pengujian | Hasil yang Diharapkan | Status |
 |---|---|---|---|:---:|
 | 4.1 | **Navigasi Sidebar** | Klik menu "Beranda", "Cari", dan "Pengaturan" di sidebar kiri. | Halaman berganti seketika dengan transisi mulus; status pemutaran audio di bar bawah TIDAK terputus. | [x] Terverifikasi Otomatis |
-| 4.2 | **Halaman Pengaturan** | Buka menu Pengaturan. | Tampil info versi aplikasi (v0.1.2), commit hash pendek, sumber musik aktif (YouTube Music), opsi kualitas audio, dan tombol hapus riwayat. | [x] Terverifikasi Otomatis |
+| 4.2 | **Halaman Pengaturan** | Buka menu Pengaturan. | Tampil info versi aplikasi (v0.1.3), commit hash pendek, sumber musik aktif (YouTube Music), opsi kualitas audio, dan tombol hapus riwayat. | [x] Terverifikasi Otomatis |
 | 4.3 | **Keamanan Teks (No XSS)** | Cari lagu dengan karakter khusus (misal: `<script>alert(1)</script>`). | Teks dirender sebagai teks biasa murni; tidak ada eksekusi HTML/JavaScript. | [x] Terverifikasi Otomatis |
 
 ---
@@ -73,6 +73,11 @@ Dokumen ini berisi panduan dan daftar periksa pengujian manual (*manual acceptan
 | 5.9 | **Smoke Test Binary Rilis Mandiri** | Jalankan `scripts/smoke_test_release.py` pada build hasil instalasi tanpa CDP / env var uji. | Membaca `%APPDATA%\Musick\runtime-status.json` dan membuktikan `isPackaged === true`, sumber aktif `ytmusic`, dan mock source tidak ada. | [x] Terverifikasi Otomatis |
 | 5.10 | **Pengerasan DB & Hapus Riwayat Permanen** | Tekan tombol "Hapus Riwayat Putar & Cari" di Pengaturan. | Seluruh baris riwayat putar dan riwayat pencarian dihapus permanen dari berkas `musick.db` (baris = 0). | [x] Terverifikasi Otomatis |
 | 5.11 | **Pencarian 1 Request Unfiltered (Tab Semua)** | Ketik kata kunci pada kolom Cari. | Mengirimkan tepat 1 permintaan tanpa filter (hasil campuran), menghemat 66,7% beban HTTP dan mematuhi throttle 250ms. | [x] Terverifikasi Otomatis |
+| 5.12 | **Pemutaran Saat Layar Mati (Display Off Timeout)** | Biarkan laptop hingga batas waktu layar mati tercapai tanpa menutup lid. | Audio tetap mengalir lancar, `prevent-app-suspension` aktif, panel layar mati normal. | [x] Terverifikasi Otomatis (CDP Simulation) / [ ] Belum diverifikasi di perangkat nyata |
+| 5.13 | **Kunci Layar (Lock Screen Win+L)** | Kunci layar Windows (Win+L) saat pemutaran sedang berlangsung. | Audio terus berlanjut tanpa tercekik (timer renderer aktif berkat `backgroundThrottling: false`). | [x] Terverifikasi Otomatis (CDP Simulation) / [ ] Belum diverifikasi di perangkat nyata |
+| 5.14 | **Tidur Idle Sistem (Idle System Sleep)** | Biarkan komputer menyala tanpa aktivitas hingga batas waktu tidur sistem. | Saat memutar musik, tidur sistem dicegah oleh `prevent-app-suspension`. Saat jeda, komputer tidur normal. | [x] Terverifikasi Otomatis |
+| 5.15 | **Tutup Layar Manual (Lid Close)** | Tutup penutup laptop saat musik memutar (catatan: mengikuti setelan Windows 'Saat menutup penutup'). | Jika setelan "Sleep", event `suspend` tertangkap, audio terjeda dan posisi tersimpan. Jika setelan "Do nothing", musik terus berlanjut. | [ ] Belum diverifikasi di perangkat nyata |
+| 5.16 | **Opsi 'Tetap putar saat layar mati'** | Matikan toggle "Tetap putar saat layar mati" di Pengaturan, lalu putar musik. | Blocker daya tidak diaktifkan (`active: false, settingEnabled: false`), menghormati preferensi hemat baterai. | [x] Terverifikasi Otomatis |
 
 ---
 
@@ -89,9 +94,14 @@ Dokumen ini berisi panduan dan daftar periksa pengujian manual (*manual acceptan
 8. Pintasan keyboard Space, ArrowLeft, ArrowRight, ArrowDown, ArrowUp, dan M.
 9. Persistensi SQLite untuk riwayat, antrean, dan playback state.
 10. Smoke test binary rilis mandiri tanpa harness CDP.
+11. Siklus hidup `powerSaveBlocker` ('prevent-app-suspension') aktif saat playing, berhenti saat pause.
+12. Transisi lagu otomatis di latar belakang saat jendela tidak terlihat.
+13. Sakelar pengaturan "Tetap putar saat layar mati" mengontrol status blocker secara dinamis.
 
 ### B. Bagian yang Memerlukan Checklist Manual Fisik (Lingkungan Nyata):
 1. **Tombol Fisik Multimedia Keyboard Windows:** Menekan tombol Fn/Media Play/Pause/Next pada keyboard laptop/eksternal fisik untuk menguji respons Media Session API.
 2. **Pencabutan Fisik Perangkat Audio:** Mencabut jack audio 3.5mm atau memutuskan sambungan headset Bluetooth fisik untuk menguji penanganan event `devicechange` (jeda otomatis).
-3. **Siklus Tidur/Bangun Laptop (Sleep/Wake):** Menutup layar laptop (lid close) lalu membuka kembali untuk memverifikasi pemulihan status pemutar tanpa crash.
-4. **Dialog Peringatan Windows SmartScreen:** Memverifikasi tampilan prompt biru *"Windows protected your PC"* pada laptop Windows pengguna lain yang belum pernah memasang aplikasi.
+3. **Siklus Tidur/Bangun Laptop (Sleep/Wake) Fisik:** Menutup layar laptop (lid close) dengan setelan Windows "Sleep" lalu membuka kembali untuk memverifikasi pemulihan status pemutar tanpa crash.
+4. **Layar Mati Fisik (Display Timeout):** Menunggu layar laptop mati sendiri tanpa menyentuh keyboard/mouse dan mendengarkan audio speaker tetap mengalir.
+5. **Kunci Layar Fisik (Win+L):** Menekan Win+L di keyboard fisik dan memastikan audio tidak tersendat.
+6. **Dialog Peringatan Windows SmartScreen:** Memverifikasi tampilan prompt biru *"Windows protected your PC"* pada laptop Windows pengguna lain yang belum pernah memasang aplikasi.

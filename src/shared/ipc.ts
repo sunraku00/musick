@@ -19,7 +19,15 @@ export const IPC_CHANNELS = {
   DB_ADD_HISTORY: 'db:add-history',
   DB_GET_HISTORY: 'db:get-history',
   DB_CLEAR_ALL_HISTORY: 'db:clear-all-history',
+  POWER_SET_PLAYBACK_ACTIVE: 'power:set-playback-active',
+  POWER_GET_BLOCKER_STATUS: 'power:get-blocker-status',
 } as const;
+
+export interface PowerBlockerStatus {
+  readonly active: boolean;
+  readonly blockerId: number | null;
+  readonly settingEnabled: boolean;
+}
 
 export interface ClearHistoryResult {
   readonly playbackCleared: number;
@@ -58,6 +66,8 @@ export interface MusicApi {
   dbAddHistory(track: Track): Promise<void>;
   dbGetHistory(limit?: number): Promise<Track[]>;
   dbClearAllHistory(): Promise<ClearHistoryResult>;
+  setPowerSaveBlocker(isPlaying: boolean): Promise<void>;
+  getPowerSaveBlockerStatus(): Promise<PowerBlockerStatus>;
   onSuspend(callback: () => void): () => void;
   onResume(callback: () => void): () => void;
 }

@@ -4,12 +4,25 @@ import { ID_STRINGS } from '../../shared/i18n/id';
 export const SettingsPage: React.FC = () => {
   const [audioQuality, setAudioQuality] = useState<'economy' | 'high'>('economy');
   const [activeSourceName, setActiveSourceName] = useState<string>('Memuat...');
+  const [keepPlayingOnScreenOff, setKeepPlayingOnScreenOff] = useState<boolean>(true);
   const [appInfo, setAppInfo] = useState<{ version: string; commitHash: string }>({
-    version: '0.1.2',
+    version: '0.1.3',
     commitHash: '492a4c7',
   });
 
   const [clearStatus, setClearStatus] = useState<string | null>(null);
+
+  const handleToggleScreenOff = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const nextVal = e.target.checked;
+    setKeepPlayingOnScreenOff(nextVal);
+    if (window.musicApi) {
+      try {
+        await window.musicApi.dbSetSetting('keepPlayingOnScreenOff', nextVal ? 'true' : 'false');
+      } catch (err) {
+        console.warn('Gagal menyimpan pengaturan keepPlayingOnScreenOff:', err);
+      }
+    }
+  };
 
   const handleClearHistory = async () => {
     if (!window.confirm('Apakah Anda yakin ingin menghapus seluruh riwayat putar dan riwayat cari secara permanen?')) {
@@ -30,14 +43,18 @@ export const SettingsPage: React.FC = () => {
     const fetchInfo = async () => {
       try {
         if (window.musicApi) {
-          const [activeId, sources, info] = await Promise.all([
+          const [activeId, sources, info, savedPowerSetting] = await Promise.all([
             window.musicApi.getActiveSource(),
             window.musicApi.listSources(),
             window.musicApi.getAppInfo ? window.musicApi.getAppInfo() : Promise.resolve({ version: '0.1.1', commitHash: 'd3e530d' }),
+            window.musicApi.dbGetSetting ? window.musicApi.dbGetSetting('keepPlayingOnScreenOff') : Promise.resolve(null),
           ]);
           const match = sources.find((s) => s.id === activeId);
           setActiveSourceName(match ? `${match.name} (${activeId})` : (activeId || 'YouTube Music'));
           if (info) setAppInfo(info);
+          if (savedPowerSetting !== null) {
+            setKeepPlayingOnScreenOff(savedPowerSetting !== 'false');
+          }
         }
       } catch {
         setActiveSourceName('YouTube Music (ytmusic)');
@@ -99,6 +116,31 @@ export const SettingsPage: React.FC = () => {
             </div>
           </label>
         </div>
+      </section>
+
+      {/* Pemutaran & Daya */}
+      <section style={{ backgroundColor: '#181818', borderRadius: '8px', padding: '24px', marginBottom: '24px', border: '1px solid #282828' }}>
+        <h3 style={{ fontSize: '16px', fontWeight: 600, color: '#ffffff', margin: '0 0 16px 0' }}>
+          {ID_STRINGS.settings.playbackAndPower}
+        </h3>
+
+        <label style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', cursor: 'pointer' }}>
+          <input
+            id="checkbox-screen-off-playback"
+            type="checkbox"
+            checked={keepPlayingOnScreenOff}
+            onChange={handleToggleScreenOff}
+            style={{ marginTop: '3px', accentColor: '#1db954', width: '16px', height: '16px', cursor: 'pointer' }}
+          />
+          <div>
+            <div style={{ fontSize: '14px', fontWeight: 500, color: '#ffffff' }}>
+              {ID_STRINGS.settings.keepPlayingOnScreenOff}
+            </div>
+            <div style={{ fontSize: '12px', color: '#888888', marginTop: '4px', lineHeight: '1.5' }}>
+              {ID_STRINGS.settings.keepPlayingOnScreenOffDesc}
+            </div>
+          </div>
+        </label>
       </section>
 
       {/* Privasi dan Lisensi */}

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, protocol, net, powerMonitor } from 'electron';
+import { app, BrowserWindow, protocol, net, powerMonitor, powerSaveBlocker } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
@@ -34,7 +34,44 @@ protocol.registerSchemesAsPrivileged([
 
 let mainWindow: BrowserWindow | null = null;
 let dbService: DatabaseService | null = null;
+let activeBlockerId: number | null = null;
+let lastIsPlaying = false;
 const sourceManager = new SourceManager();
+
+function updatePowerSaveBlocker(isPlaying?: boolean): { active: boolean; blockerId: number | null; settingEnabled: boolean } {
+  if (typeof isPlaying === 'boolean') {
+    lastIsPlaying = isPlaying;
+  }
+  const isEnabled = dbService ? dbService.getSetting('keepPlayingOnScreenOff') !== 'false' : true;
+
+  if (lastIsPlaying && isEnabled) {
+    if (activeBlockerId === null || !powerSaveBlocker.isStarted(activeBlockerId)) {
+      activeBlockerId = powerSaveBlocker.start('prevent-app-suspension');
+      console.log(`[PowerSaveBlocker] Mengaktifkan prevent-app-suspension (ID: ${activeBlockerId})`);
+    }
+  } else {
+    if (activeBlockerId !== null && powerSaveBlocker.isStarted(activeBlockerId)) {
+      powerSaveBlocker.stop(activeBlockerId);
+      console.log(`[PowerSaveBlocker] Melepas prevent-app-suspension (ID: ${activeBlockerId})`);
+      activeBlockerId = null;
+    }
+  }
+
+  return {
+    active: activeBlockerId !== null && powerSaveBlocker.isStarted(activeBlockerId),
+    blockerId: activeBlockerId,
+    settingEnabled: isEnabled,
+  };
+}
+
+function getPowerSaveBlockerStatus(): { active: boolean; blockerId: number | null; settingEnabled: boolean } {
+  const isEnabled = dbService ? dbService.getSetting('keepPlayingOnScreenOff') !== 'false' : true;
+  return {
+    active: activeBlockerId !== null && powerSaveBlocker.isStarted(activeBlockerId),
+    blockerId: activeBlockerId,
+    settingEnabled: isEnabled,
+  };
+}
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -49,6 +86,7 @@ function createWindow(): void {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      backgroundThrottling: false, // Mencegah Chromium membatasi timer saat layar mati / jendela tertutup
       preload: path.join(__dirname, '../preload/index.cjs'),
     },
   });
@@ -56,8 +94,13 @@ function createWindow(): void {
   // Terapkan kebijakan keamanan ketat
   setupSecurityPolicies(mainWindow);
 
-  // Daftarkan handler IPC bertipe dengan layanan database SQLite
-  registerIpcHandlers(sourceManager, dbService || undefined);
+  // Daftarkan handler IPC bertipe dengan layanan database SQLite dan pengelola blocker
+  registerIpcHandlers(
+    sourceManager,
+    dbService || undefined,
+    updatePowerSaveBlocker,
+    getPowerSaveBlockerStatus
+  );
 
   const devServerUrl = process.env.VITE_DEV_SERVER_URL;
   if (devServerUrl) {
@@ -118,7 +161,12 @@ if (!gotTheLock) {
 
     // Integrasi powerMonitor untuk mendeteksi siklus tidur/bangun (Sleep/Wake)
     powerMonitor.on('suspend', () => {
-      console.log('[PowerMonitor] Komputer memasuki mode tidur (suspend)');
+      console.log('[PowerMonitor] Komputer memasuki mode tidur sistem (suspend)');
+      // Saat tidur sistem sungguhan, pastikan blocker dilepas agar tidak menghambat penangguhan sistem
+      if (activeBlockerId !== null && powerSaveBlocker.isStarted(activeBlockerId)) {
+        powerSaveBlocker.stop(activeBlockerId);
+        activeBlockerId = null;
+      }
       if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send('power:suspend');
       }
@@ -169,9 +217,13 @@ if (!gotTheLock) {
     createWindow();
   });
 
-  // Pembersihan pohon proses saat aplikasi keluar
+  // Pembersihan pohon proses dan blocker saat aplikasi keluar
   const cleanUpAndQuit = () => {
     try {
+      if (activeBlockerId !== null && powerSaveBlocker.isStarted(activeBlockerId)) {
+        powerSaveBlocker.stop(activeBlockerId);
+        activeBlockerId = null;
+      }
       if (dbService) {
         dbService.close();
         dbService = null;

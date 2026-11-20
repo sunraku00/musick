@@ -65,6 +65,10 @@ export const ID_STRINGS = {
     qualityHigh: 'Tinggi (AAC / WebM ~256 kbps bila tersedia)',
     qualityHighDesc: 'Kualitas audio maksimal (~110 MB/jam). Membutuhkan kuota lebih besar.',
     privacyTitle: 'Pernyataan Privasi',
+    playbackAndPower: 'Pemutaran & Daya',
+    keepPlayingOnScreenOff: 'Tetap putar saat layar mati',
+    keepPlayingOnScreenOffDesc:
+      'Mencegah Windows menidurkan aplikasi saat layar mati atau terkunci agar musik terus berlanjut. Layar tetap diizinkan mati untuk menghemat daya baterai.',
     privacyText:
       'Aplikasi ini tidak punya iklan, akun, analitik, atau pelaporan crash otomatis pihak ketiga. Data tersimpan lokal di komputer Anda. Permintaan audio langsung menghubungi CDN layanan musik.',
   },

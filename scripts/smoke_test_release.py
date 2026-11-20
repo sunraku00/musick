@@ -93,8 +93,11 @@ def main():
     if "mock" in sources:
         errors.append(f"'mock' terdaftar dalam sources rilis: {sources}")
 
-    if status_data.get("version") != "0.1.2":
-        errors.append(f"version bukan '0.1.2' (didapat: {status_data.get('version')})")
+    with open(os.path.join(os.path.dirname(__file__), "..", "package.json"), "r") as f:
+        pkg_version = json.load(f).get("version", "0.1.3")
+
+    if status_data.get("version") != pkg_version:
+        errors.append(f"version bukan '{pkg_version}' (didapat: {status_data.get('version')})")
 
     if errors:
         print("[FAIL] Verifikasi Smoke Test Gagal:")
