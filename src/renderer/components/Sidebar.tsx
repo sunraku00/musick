@@ -43,7 +43,7 @@ export const Sidebar: React.FC = () => {
           <h1 style={{ fontSize: '18px', fontWeight: 'bold', margin: 0, color: '#ffffff' }}>
             {ID_STRINGS.app.title}
           </h1>
-          <span style={{ fontSize: '11px', color: '#b3b3b3' }}>v0.1.0</span>
+          <span style={{ fontSize: '11px', color: '#b3b3b3' }}>v0.1.1</span>
         </div>
       </div>
 

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { NavigationProvider, useNavigation } from './contexts/NavigationContext';
 import { PlayerProvider, usePlayer } from './contexts/PlayerContext';
 import { Sidebar } from './components/Sidebar';
@@ -6,10 +6,51 @@ import { PlayerBar } from './components/PlayerBar';
 import { HomePage } from './pages/HomePage';
 import { SearchPage } from './pages/SearchPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { ArtistPage } from './pages/ArtistPage';
+import { AlbumPage } from './pages/AlbumPage';
 
 const AppContent: React.FC = () => {
   const { currentPage } = useNavigation();
-  const { toastMessage } = usePlayer();
+  const { toastMessage, state, togglePlay, seek, setVolume, toggleMute } = usePlayer();
+
+  // Aksesibilitas Keyboard Global (PRD F2)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      // Jangan cegah spasi / panah saat pengguna sedang mengetik di input pencarian
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+
+      if (e.code === 'Space') {
+        e.preventDefault();
+        togglePlay();
+      } else if (e.code === 'ArrowLeft') {
+        e.preventDefault();
+        seek(Math.max(0, state.positionSec - 5));
+      } else if (e.code === 'ArrowRight') {
+        e.preventDefault();
+        seek(Math.min(state.durationSec, state.positionSec + 5));
+      } else if (e.code === 'ArrowUp') {
+        e.preventDefault();
+        setVolume(Math.min(1, state.volume + 0.05));
+      } else if (e.code === 'ArrowDown') {
+        e.preventDefault();
+        setVolume(Math.max(0, state.volume - 0.05));
+      } else if (e.key === 'm' || e.key === 'M') {
+        e.preventDefault();
+        toggleMute();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [state, togglePlay, seek, setVolume, toggleMute]);
 
   return (
     <div
@@ -62,6 +103,8 @@ const AppContent: React.FC = () => {
           {currentPage === 'home' && <HomePage />}
           {currentPage === 'search' && <SearchPage />}
           {currentPage === 'settings' && <SettingsPage />}
+          {currentPage === 'artist' && <ArtistPage />}
+          {currentPage === 'album' && <AlbumPage />}
         </main>
       </div>
 

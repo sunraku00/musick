@@ -68,6 +68,34 @@ describe('Contract Test: MockSource (100% Offline Mandatory Contract)', () => {
     });
   });
 
+  describe('getArtist()', () => {
+    it('mengambil data artis beserta topTracks dan albums', async () => {
+      const artist = await source.getArtist('artist-1');
+      expect(artist).toBeDefined();
+      expect(artist.name).toBe('Suara Pesisir');
+      expect(artist.topTracks?.length).toBeGreaterThan(0);
+      expect(artist.albums?.length).toBeGreaterThan(0);
+    });
+
+    it('melempar MusicSourceError(UNAVAILABLE) jika artis tidak ditemukan', async () => {
+      await expect(source.getArtist('nonexistent-artist')).rejects.toThrow(MusicSourceError);
+    });
+  });
+
+  describe('getAlbum()', () => {
+    it('mengambil data album beserta daftar tracks', async () => {
+      const album = await source.getAlbum('album-1');
+      expect(album).toBeDefined();
+      expect(album.title).toBe('Melodi Nusantara');
+      expect(album.tracks?.length).toBeGreaterThan(0);
+      expect(album.artists.length).toBeGreaterThan(0);
+    });
+
+    it('melempar MusicSourceError(UNAVAILABLE) jika album tidak ditemukan', async () => {
+      await expect(source.getAlbum('nonexistent-album')).rejects.toThrow(MusicSourceError);
+    });
+  });
+
   describe('resolveStream()', () => {
     it('mengembalikan stream URL data URI yang langsung dapat dibunyikan', async () => {
       const stream = await source.resolveStream('track-1');

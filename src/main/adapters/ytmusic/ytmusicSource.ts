@@ -65,14 +65,26 @@ export class YtMusicSource implements MusicSource {
     if (!sourceId) {
       throw new MusicSourceError('UNAVAILABLE', 'ID artis kosong');
     }
-    throw new MusicSourceError('UNAVAILABLE', 'Fitur getArtist belum diimplementasikan di spike M0');
+    await this.throttle();
+    const cleanId = sourceId.startsWith('ytmusic:') ? sourceId.slice('ytmusic:'.length) : sourceId;
+    const artist = await this.bridge.getArtist(cleanId);
+    if (!artist || !artist.name) {
+      throw new MusicSourceError('SOURCE_CHANGED', 'Format detail artis tidak sesuai');
+    }
+    return artist;
   }
 
   async getAlbum(sourceId: string): Promise<Album> {
     if (!sourceId) {
       throw new MusicSourceError('UNAVAILABLE', 'ID album kosong');
     }
-    throw new MusicSourceError('UNAVAILABLE', 'Fitur getAlbum belum diimplementasikan di spike M0');
+    await this.throttle();
+    const cleanId = sourceId.startsWith('ytmusic:') ? sourceId.slice('ytmusic:'.length) : sourceId;
+    const album = await this.bridge.getAlbum(cleanId);
+    if (!album || !album.title) {
+      throw new MusicSourceError('SOURCE_CHANGED', 'Format detail album tidak sesuai');
+    }
+    return album;
   }
 
   /**

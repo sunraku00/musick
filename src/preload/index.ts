@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { MusicSourceError, type MusicSourceErrorPayload } from '../shared/errors';
-import { IPC_CHANNELS, type MusicApi } from '../shared/ipc';
+import { IPC_CHANNELS, type AppInfo, type MusicApi, type SavedPlayback } from '../shared/ipc';
 import type { Album, Artist, SearchResult, SourceMeta, StreamInfo, Track } from '../shared/types';
 
 interface IpcResult<T> {
@@ -44,6 +44,43 @@ const api: MusicApi = {
   },
   listSources: (): Promise<SourceMeta[]> => {
     return invokeIpc<SourceMeta[]>(IPC_CHANNELS.LIST_SOURCES);
+  },
+  getAppInfo: (): Promise<AppInfo> => {
+    return invokeIpc<AppInfo>(IPC_CHANNELS.GET_APP_INFO);
+  },
+  dbGetSetting: (key: string): Promise<string | null> => {
+    return invokeIpc<string | null>(IPC_CHANNELS.DB_GET_SETTING, key);
+  },
+  dbSetSetting: (key: string, value: string): Promise<void> => {
+    return invokeIpc<void>(IPC_CHANNELS.DB_SET_SETTING, key, value);
+  },
+  dbSavePlayback: (state: SavedPlayback): Promise<void> => {
+    return invokeIpc<void>(IPC_CHANNELS.DB_SAVE_PLAYBACK, state);
+  },
+  dbGetPlayback: (): Promise<SavedPlayback | null> => {
+    return invokeIpc<SavedPlayback | null>(IPC_CHANNELS.DB_GET_PLAYBACK);
+  },
+  dbSaveQueue: (tracks: Track[]): Promise<void> => {
+    return invokeIpc<void>(IPC_CHANNELS.DB_SAVE_QUEUE, tracks);
+  },
+  dbGetQueue: (): Promise<Track[]> => {
+    return invokeIpc<Track[]>(IPC_CHANNELS.DB_GET_QUEUE);
+  },
+  dbAddHistory: (track: Track): Promise<void> => {
+    return invokeIpc<void>(IPC_CHANNELS.DB_ADD_HISTORY, track);
+  },
+  dbGetHistory: (limit?: number): Promise<Track[]> => {
+    return invokeIpc<Track[]>(IPC_CHANNELS.DB_GET_HISTORY, limit);
+  },
+  onSuspend: (callback: () => void): (() => void) => {
+    const handler = () => callback();
+    ipcRenderer.on('power:suspend', handler);
+    return () => ipcRenderer.removeListener('power:suspend', handler);
+  },
+  onResume: (callback: () => void): (() => void) => {
+    const handler = () => callback();
+    ipcRenderer.on('power:resume', handler);
+    return () => ipcRenderer.removeListener('power:resume', handler);
   },
 };
 

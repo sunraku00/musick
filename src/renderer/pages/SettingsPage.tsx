@@ -4,23 +4,29 @@ import { ID_STRINGS } from '../../shared/i18n/id';
 export const SettingsPage: React.FC = () => {
   const [audioQuality, setAudioQuality] = useState<'economy' | 'high'>('economy');
   const [activeSourceName, setActiveSourceName] = useState<string>('Memuat...');
+  const [appInfo, setAppInfo] = useState<{ version: string; commitHash: string }>({
+    version: '0.1.1',
+    commitHash: 'd3e530d',
+  });
 
   useEffect(() => {
-    const fetchSource = async () => {
+    const fetchInfo = async () => {
       try {
         if (window.musicApi) {
-          const [activeId, sources] = await Promise.all([
+          const [activeId, sources, info] = await Promise.all([
             window.musicApi.getActiveSource(),
             window.musicApi.listSources(),
+            window.musicApi.getAppInfo ? window.musicApi.getAppInfo() : Promise.resolve({ version: '0.1.1', commitHash: 'd3e530d' }),
           ]);
           const match = sources.find((s) => s.id === activeId);
           setActiveSourceName(match ? `${match.name} (${activeId})` : (activeId || 'YouTube Music'));
+          if (info) setAppInfo(info);
         }
       } catch {
         setActiveSourceName('YouTube Music (ytmusic)');
       }
     };
-    fetchSource();
+    fetchInfo();
   }, []);
 
   return (
@@ -88,7 +94,7 @@ export const SettingsPage: React.FC = () => {
         </p>
 
         <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid #282828', fontSize: '12px', color: '#777777', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          <div>Musick v0.1.0 • Desktop Windows 64-bit • Dibangun dengan Electron + React</div>
+          <div id="app-version-info">Musick v{appInfo.version} ({appInfo.commitHash}) • Desktop Windows 64-bit • Dibangun dengan Electron + React</div>
           <div id="active-source-badge" style={{ color: '#1db954', fontWeight: 500 }}>
             Sumber musik aktif: {activeSourceName}
           </div>

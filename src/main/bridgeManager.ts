@@ -291,6 +291,14 @@ export class BridgeManager {
     return this.call<Track>('track', { sourceId });
   }
 
+  async getArtist(sourceId: string): Promise<Artist> {
+    return this.call<Artist>('artist', { sourceId });
+  }
+
+  async getAlbum(sourceId: string): Promise<Album> {
+    return this.call<Album>('album', { sourceId });
+  }
+
   async resolveStream(sourceId: string): Promise<StreamInfo> {
     return this.call<StreamInfo>('resolve', { sourceId });
   }

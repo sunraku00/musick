@@ -1,7 +1,7 @@
 {
   "name": "musiiiicccck",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Aplikasi Pemutar Musik Windows Ringan dan Mandiri",
   "author": "Musick Team",
   "main": "dist/main/index.js",
@@ -55,6 +55,7 @@
       ]
     },
     "nsis": {
+      "artifactName": "${productName} Setup ${version}.${ext}",
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "perMachine": false,

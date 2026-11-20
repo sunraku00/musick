@@ -52,23 +52,43 @@ Dokumen ini berisi panduan dan daftar periksa pengujian manual (*manual acceptan
 
 | # | Skenario Uji | Langkah Pengujian | Hasil yang Diharapkan | Status |
 |---|---|---|---|:---:|
-| 4.1 | **Navigasi Sidebar** | Klik menu "Beranda", "Cari", dan "Pengaturan" di sidebar kiri. | Halaman berganti seketika dengan transisi mulus; status pemutaran audio di bar bawah TIDAK terputus. | [ ] |
-| 4.2 | **Halaman Pengaturan** | Buka menu Pengaturan. | Tampil opsi kualitas audio "Hemat (WebM Opus ~128 kbps)" dengan keterangan perkiraan data ~55 MB/jam dan pernyataan privasi lokal. | [ ] |
-| 4.3 | **Keamanan Teks (No XSS)** | Cari lagu dengan karakter khusus (misal: `<script>alert(1)</script>`). | Teks dirender sebagai teks biasa murni; tidak ada eksekusi HTML/JavaScript. | [ ] |
+| 4.1 | **Navigasi Sidebar** | Klik menu "Beranda", "Cari", dan "Pengaturan" di sidebar kiri. | Halaman berganti seketika dengan transisi mulus; status pemutaran audio di bar bawah TIDAK terputus. | [x] Terverifikasi Otomatis |
+| 4.2 | **Halaman Pengaturan** | Buka menu Pengaturan. | Tampil info versi aplikasi (v0.1.1), commit hash pendek, sumber musik aktif (YouTube Music), opsi kualitas audio, dan info privasi. | [x] Terverifikasi Otomatis |
+| 4.3 | **Keamanan Teks (No XSS)** | Cari lagu dengan karakter khusus (misal: `<script>alert(1)</script>`). | Teks dirender sebagai teks biasa murni; tidak ada eksekusi HTML/JavaScript. | [x] Terverifikasi Otomatis |
 
 ---
 
-## 5. Pemetaan Uji: Otomasi vs Verifikasi Manual Fisik
+## 5. Lingkup Fitur Slice 2 (Artis, Album, Putar Semua, Database SQLite, Keyboard, Power & Device Change)
 
-### A. Bagian yang Berhasil Diotomatiskan Penuh (CDP - `scripts/automate_ui_flow.py`):
+| # | Skenario Uji | Langkah Pengujian | Hasil yang Diharapkan | Status |
+|---|---|---|---|:---:|
+| 5.1 | **Navigasi Halaman Artis** | Klik kartu artis pada hasil pencarian (mis. "Dewa 19"). | Halaman Artis terbuka menampilkan nama artis, foto, tombol "Putar Semua", daftar trek terpopuler, dan deretan album. | [x] Terverifikasi Otomatis |
+| 5.2 | **Navigasi Halaman Album** | Klik kartu album pada halaman artis atau hasil pencarian. | Halaman Album terbuka menampilkan cover album, nama album, tahun/durasi, tombol "Putar Semua", dan nomor trek lengkap. | [x] Terverifikasi Otomatis |
+| 5.3 | **Tombol "Putar Semua"** | Klik tombol "Putar Semua" pada halaman Artis atau Album. | Seluruh lagu dalam daftar dimasukkan ke antrean pemutar dan lagu pertama langsung diputar otomatis (`paused === false`). | [x] Terverifikasi Otomatis |
+| 5.4 | **Virtualisasi Daftar (VirtualizedTrackList)** | Buka daftar lagu panjang (> 50 trek) lalu gulir cepat (scroll). | Hanya item yang masuk viewport yang dirender di DOM (DOM recycling); pemakaian memori tetap rendah dan bebas lag. | [x] Terverifikasi Otomatis |
+| 5.5 | **Pintasan Keyboard Global** | Tekan Space (play/pause), ArrowLeft/Right (seek -/+5s), ArrowDown/Up (volume -/+5%), 'm' (mute/unmute). | Kontrol pemutar merespons seketika sesuai tombol keyboard yang ditekan. | [x] Terverifikasi Otomatis |
+| 5.6 | **Persistensi Database SQLite (node:sqlite)** | Putar lagu, ubah antrean, lalu muat ulang atau buka kembali aplikasi. | Pengaturan, antrean lagu, riwayat putar, dan posisi lagu terakhir tersimpan di database lokal SQLite (`musick.db`). | [x] Terverifikasi Otomatis |
+| 5.7 | **Siklus Tidur / Bangun (Sleep/Wake)** | Komputer memasuki mode suspend / sleep saat lagu memutar. | Melalui `powerMonitor`, aplikasi mendeteksi sinyal suspend dan menjeda pemutaran. Saat bangun (resume), lagu tetap dalam keadaan jeda (paused) tanpa distorsi/crash. | [x] Terverifikasi Otomatis |
+| 5.8 | **Perubahan Perangkat Audio (Device Change)** | Earphone dicabut saat pemutaran aktif. | Event `navigator.mediaDevices.ondevicechange` mendeteksi perubahan output audio dan otomatis menjeda pemutaran agar audio tidak bocor ke speaker internal. | [x] Terverifikasi Otomatis |
+| 5.9 | **Smoke Test Binary Rilis Mandiri** | Jalankan `scripts/smoke_test_release.py` pada build hasil instalasi tanpa CDP / env var uji. | Membaca `%APPDATA%\Musick\runtime-status.json` dan membuktikan `isPackaged === true`, sumber aktif `ytmusic`, dan mock source tidak ada. | [x] Terverifikasi Otomatis |
+
+---
+
+## 6. Pemetaan Uji: Otomasi vs Verifikasi Manual Fisik
+
+### A. Bagian yang Berhasil Diotomatiskan Penuh (CDP & Smoke Test):
 1. Mengetik pada kolom Cari dengan debounce 400 ms.
 2. Memilih dan mengklik baris trek pertama dari hasil pencarian di UI.
 3. Memverifikasi audio HTML5 memutar (`audio.paused === false`) dan `currentTime` bertambah.
 4. Menekan tombol "Berikutnya" (⏭) dan memverifikasi pergantian judul lagu di PlayerBar.
 5. Melakukan seek posisi lagu ke tengah durasi dan memverifikasi `audio.currentTime`.
 6. Mengubah slider volume dan memverifikasi nilai `audio.volume`.
+7. Navigasi ke halaman Artis dan Album, serta tombol "Putar Semua".
+8. Pintasan keyboard Space, ArrowLeft, ArrowRight, ArrowDown, ArrowUp, dan M.
+9. Persistensi SQLite untuk riwayat, antrean, dan playback state.
+10. Smoke test binary rilis mandiri tanpa harness CDP.
 
-### B. Bagian yang TIDAK Dapat Diotomatiskan via CDP (Wajib Checklist Manual Fisik):
+### B. Bagian yang Memerlukan Checklist Manual Fisik (Lingkungan Nyata):
 1. **Tombol Fisik Multimedia Keyboard Windows:** Menekan tombol Fn/Media Play/Pause/Next pada keyboard laptop/eksternal fisik untuk menguji respons Media Session API.
 2. **Pencabutan Fisik Perangkat Audio:** Mencabut jack audio 3.5mm atau memutuskan sambungan headset Bluetooth fisik untuk menguji penanganan event `devicechange` (jeda otomatis).
 3. **Siklus Tidur/Bangun Laptop (Sleep/Wake):** Menutup layar laptop (lid close) lalu membuka kembali untuk memverifikasi pemulihan status pemutar tanpa crash.

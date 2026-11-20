@@ -1,10 +1,23 @@
+import { execSync } from 'child_process';
+import fs from 'fs';
 import path from 'path';
 import { build } from 'vite';
 
+const pkg = JSON.parse(fs.readFileSync('package.json', 'utf-8'));
+let commitHash = 'd3e530d';
+try {
+  commitHash = execSync('git rev-parse --short HEAD').toString().trim();
+} catch {}
+process.env.COMMIT_HASH = commitHash;
+
 async function buildAll() {
-  console.log('--- Membangun Renderer (UI React) ---');
+  console.log(`--- Membangun Renderer Musick v${pkg.version} (${commitHash}) ---`);
   await build({
     base: './',
+    define: {
+      __APP_VERSION__: JSON.stringify(pkg.version),
+      __COMMIT_HASH__: JSON.stringify(commitHash),
+    },
     build: {
       outDir: 'dist/renderer',
       emptyOutDir: true,
@@ -32,6 +45,10 @@ async function buildAll() {
   console.log('--- Membangun Main Process (Electron) ---');
   await build({
     configFile: false,
+    define: {
+      __APP_VERSION__: JSON.stringify(pkg.version),
+      __COMMIT_HASH__: JSON.stringify(commitHash),
+    },
     build: {
       target: 'node20',
       emptyOutDir: true,
@@ -43,7 +60,20 @@ async function buildAll() {
         fileName: () => 'index.js',
       },
       rollupOptions: {
-        external: ['electron', 'path', 'url', 'fs', 'http', 'https', 'child_process'],
+        external: [
+          'electron',
+          'path',
+          'url',
+          'fs',
+          'http',
+          'https',
+          'child_process',
+          'node:sqlite',
+          'node:fs',
+          'node:path',
+          'node:url',
+          'node:child_process',
+        ],
       },
     },
   });

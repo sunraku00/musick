@@ -1,10 +1,13 @@
 import { app, ipcMain } from 'electron';
 import { MusicSourceError, type MusicSourceErrorPayload } from '../shared/errors';
-import { IPC_CHANNELS } from '../shared/ipc';
+import { IPC_CHANNELS, type AppInfo, type SavedPlayback } from '../shared/ipc';
 import type { MusicSource } from '../shared/source';
-import type { SourceMeta } from '../shared/types';
+import type { SourceMeta, Track } from '../shared/types';
 import { MockSource } from './adapters/mock/mockSource';
 import { YtMusicSource } from './adapters/ytmusic/ytmusicSource';
+import { DatabaseService } from './db/database';
+
+declare const __COMMIT_HASH__: string;
 
 export interface SourceManagerOptions {
   readonly isPackaged?: boolean;
@@ -75,7 +78,10 @@ export class SourceManager {
   }
 }
 
-export function registerIpcHandlers(sourceManager: SourceManager): void {
+export function registerIpcHandlers(
+  sourceManager: SourceManager,
+  dbService?: DatabaseService
+): void {
   // Helper pembungkus untuk serialisasi error IPC
   const handleIpc = <TArgs extends unknown[], TReturn>(
     channel: string,
@@ -129,5 +135,51 @@ export function registerIpcHandlers(sourceManager: SourceManager): void {
 
   handleIpc(IPC_CHANNELS.LIST_SOURCES, async () => {
     return sourceManager.listSources();
+  });
+
+  handleIpc(IPC_CHANNELS.GET_APP_INFO, async (): Promise<AppInfo> => {
+    let ver = '0.1.1';
+    try {
+      ver = app.getVersion();
+    } catch {
+      ver = '0.1.1';
+    }
+    return {
+      version: ver,
+      commitHash: (typeof __COMMIT_HASH__ !== 'undefined' ? __COMMIT_HASH__ : process.env.COMMIT_HASH) || 'd3e530d',
+    };
+  });
+
+  // Handler Persistensi Database SQLite (node:sqlite)
+  handleIpc(IPC_CHANNELS.DB_GET_SETTING, async (key: string) => {
+    return dbService ? dbService.getSetting(key) : null;
+  });
+
+  handleIpc(IPC_CHANNELS.DB_SET_SETTING, async (key: string, value: string) => {
+    if (dbService) dbService.setSetting(key, value);
+  });
+
+  handleIpc(IPC_CHANNELS.DB_SAVE_PLAYBACK, async (state: SavedPlayback) => {
+    if (dbService) dbService.savePlaybackState(state);
+  });
+
+  handleIpc(IPC_CHANNELS.DB_GET_PLAYBACK, async () => {
+    return dbService ? dbService.getPlaybackState() : null;
+  });
+
+  handleIpc(IPC_CHANNELS.DB_SAVE_QUEUE, async (tracks: Track[]) => {
+    if (dbService) dbService.saveQueue(tracks);
+  });
+
+  handleIpc(IPC_CHANNELS.DB_GET_QUEUE, async () => {
+    return dbService ? dbService.getQueue() : [];
+  });
+
+  handleIpc(IPC_CHANNELS.DB_ADD_HISTORY, async (track: Track) => {
+    if (dbService) dbService.addHistory(track);
+  });
+
+  handleIpc(IPC_CHANNELS.DB_GET_HISTORY, async (limit?: number) => {
+    return dbService ? dbService.getHistory(limit) : [];
   });
 }

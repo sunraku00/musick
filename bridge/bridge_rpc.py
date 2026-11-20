@@ -249,6 +249,160 @@ def handle_resolve(params):
     }
 
 
+def handle_artist(params):
+    source_id = params.get('sourceId', '').strip()
+    if not source_id:
+        raise ValueError('Parameter sourceId diperlukan')
+    if ':' in source_id:
+        source_id = source_id.split(':', 1)[1]
+
+    client = get_yt()
+    artist_data = client.get_artist(source_id)
+    if not artist_data:
+        raise LookupError(f"Artis {source_id} tidak ditemukan")
+
+    name = artist_data.get('name', 'Unknown Artist')
+    thumbs = artist_data.get('thumbnails', [])
+    image_url = thumbs[-1].get('url') if thumbs else ''
+
+    # Parse top tracks
+    top_tracks = []
+    raw_songs = artist_data.get('songs', {}).get('results', [])
+    for s in raw_songs:
+        video_id = s.get('videoId')
+        if not video_id:
+            continue
+        s_artists = []
+        for a in s.get('artists', []):
+            s_artists.append({
+                'id': f"ytmusic:{a.get('id', '')}",
+                'name': a.get('name', name)
+            })
+        if not s_artists:
+            s_artists.append({'id': f"ytmusic:{source_id}", 'name': name})
+
+        s_album = None
+        if s.get('album'):
+            s_album = {
+                'id': f"ytmusic:{s['album'].get('id', '')}",
+                'title': s['album'].get('name', ''),
+            }
+
+        s_thumbs = s.get('thumbnails', [])
+        cover_url = s_thumbs[-1].get('url') if s_thumbs else ''
+
+        top_tracks.append({
+            'id': f"ytmusic:{video_id}",
+            'source': 'ytmusic',
+            'sourceId': video_id,
+            'title': s.get('title', 'Unknown Title'),
+            'artists': s_artists,
+            'album': s_album,
+            'durationSec': parse_duration_to_sec(s.get('duration') or s.get('duration_seconds', 0)),
+            'coverUrl': cover_url,
+            'isAvailable': True,
+        })
+
+    # Parse albums
+    albums_list = []
+    raw_albums = artist_data.get('albums', {}).get('results', [])
+    for alb in raw_albums:
+        alb_id = alb.get('browseId', '')
+        alb_thumbs = alb.get('thumbnails', [])
+        alb_cover = alb_thumbs[-1].get('url') if alb_thumbs else ''
+        year_val = None
+        if alb.get('year'):
+            try:
+                year_val = int(alb['year'])
+            except (ValueError, TypeError):
+                year_val = None
+        albums_list.append({
+            'id': f"ytmusic:{alb_id}",
+            'title': alb.get('title', 'Unknown Album'),
+            'coverUrl': alb_cover,
+            'year': year_val,
+        })
+
+    return {
+        'id': f"ytmusic:{source_id}",
+        'source': 'ytmusic',
+        'sourceId': source_id,
+        'name': name,
+        'imageUrl': image_url,
+        'topTracks': top_tracks,
+        'albums': albums_list,
+    }
+
+
+def handle_album(params):
+    source_id = params.get('sourceId', '').strip()
+    if not source_id:
+        raise ValueError('Parameter sourceId diperlukan')
+    if ':' in source_id:
+        source_id = source_id.split(':', 1)[1]
+
+    client = get_yt()
+    alb_data = client.get_album(source_id)
+    if not alb_data:
+        raise LookupError(f"Album {source_id} tidak ditemukan")
+
+    title = alb_data.get('title', 'Unknown Album')
+    artists = []
+    for a in alb_data.get('artists', []):
+        artists.append({
+            'id': f"ytmusic:{a.get('id', '')}",
+            'name': a.get('name', 'Unknown Artist')
+        })
+
+    thumbs = alb_data.get('thumbnails', [])
+    cover_url = thumbs[-1].get('url') if thumbs else ''
+
+    year_val = None
+    if alb_data.get('year'):
+        try:
+            year_val = int(alb_data['year'])
+        except (ValueError, TypeError):
+            year_val = None
+
+    tracks = []
+    raw_tracks = alb_data.get('tracks', [])
+    for idx, t in enumerate(raw_tracks):
+        video_id = t.get('videoId')
+        if not video_id:
+            continue
+        t_artists = []
+        for a in t.get('artists', []):
+            t_artists.append({
+                'id': f"ytmusic:{a.get('id', '')}",
+                'name': a.get('name', 'Unknown Artist')
+            })
+        if not t_artists:
+            t_artists = artists
+
+        tracks.append({
+            'id': f"ytmusic:{video_id}",
+            'source': 'ytmusic',
+            'sourceId': video_id,
+            'title': t.get('title', 'Unknown Title'),
+            'artists': t_artists,
+            'album': {'id': f"ytmusic:{source_id}", 'title': title},
+            'durationSec': parse_duration_to_sec(t.get('duration') or t.get('duration_seconds', 0)),
+            'coverUrl': cover_url,
+            'isAvailable': True,
+        })
+
+    return {
+        'id': f"ytmusic:{source_id}",
+        'source': 'ytmusic',
+        'sourceId': source_id,
+        'title': title,
+        'artists': artists,
+        'year': year_val,
+        'coverUrl': cover_url,
+        'tracks': tracks,
+    }
+
+
 def main():
     # Loop pembacaan baris stdin
     for line in sys.stdin:
@@ -276,6 +430,10 @@ def main():
                 res = handle_search(params)
             elif method == 'track':
                 res = handle_track(params)
+            elif method == 'artist':
+                res = handle_artist(params)
+            elif method == 'album':
+                res = handle_album(params)
             elif method == 'resolve':
                 res = handle_resolve(params)
             else:

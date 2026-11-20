@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { PlayerStateMachine, type PlayerState } from '../../shared/playerStateMachine';
 import type { Track } from '../../shared/types';
+import { ID_STRINGS } from '../../shared/i18n/id';
 
 interface PlayerContextValue {
   state: PlayerState;
@@ -92,6 +93,75 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       });
     }
 
+    // Inisialisasi status dari persistensi database lokal (node:sqlite)
+    const initPersistence = async () => {
+      try {
+        if (window.musicApi) {
+          const [savedQueue, savedPlayback] = await Promise.all([
+            window.musicApi.dbGetQueue(),
+            window.musicApi.dbGetPlayback(),
+          ]);
+
+          if (savedQueue && savedQueue.length > 0) {
+            let targetIdx = 0;
+            if (savedPlayback?.currentTrack) {
+              const foundIdx = savedQueue.findIndex((t) => t.id === savedPlayback.currentTrack?.id);
+              if (foundIdx >= 0) targetIdx = foundIdx;
+            }
+
+            machine.restoreState({
+              queue: savedQueue,
+              currentIndex: targetIdx,
+              positionSec: savedPlayback?.positionSec || 0,
+              volume: savedPlayback?.volume ?? 0.8,
+              isMuted: savedPlayback?.isMuted ?? false,
+            });
+          } else if (savedPlayback) {
+            if (typeof savedPlayback.volume === 'number') {
+              machine.setVolume(savedPlayback.volume);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('[PlayerContext] Gagal memuat persistensi database:', err);
+      }
+    };
+    initPersistence();
+
+    // Deteksi siklus tidur/bangun komputer (PRD F2)
+    let cleanSuspend: (() => void) | undefined;
+    let cleanResume: (() => void) | undefined;
+
+    if (window.musicApi?.onSuspend) {
+      cleanSuspend = window.musicApi.onSuspend(() => {
+        console.log('[PlayerContext] Komputer tidur: menjeda audio dan menyimpan posisi...');
+        machine.pause();
+      });
+    }
+
+    if (window.musicApi?.onResume) {
+      cleanResume = window.musicApi.onResume(() => {
+        console.log('[PlayerContext] Komputer bangun: memulihkan status dalam keadaan jeda...');
+        // Tetap dalam keadaan jeda sampai ditekan putar (PRD F2)
+        machine.pause();
+        setToastMessage('Komputer bangun dari mode tidur. Pemutaran tetap dijeda.');
+        setTimeout(() => setToastMessage(null), 4000);
+      });
+    }
+
+    // Penanganan perangkat audio berganti / headphone dicabut (PRD F2)
+    let handleDeviceChange: (() => void) | undefined;
+    if (typeof navigator !== 'undefined' && navigator.mediaDevices) {
+      handleDeviceChange = () => {
+        if (machine.getState().status === 'playing') {
+          machine.pause();
+          setToastMessage(ID_STRINGS.player.audioDeviceDisconnected);
+          setTimeout(() => setToastMessage(null), 4000);
+        }
+      };
+      navigator.mediaDevices.addEventListener('devicechange', handleDeviceChange);
+    }
+
     const unsubscribe = machine.subscribe(async (event) => {
       if (event.type === 'STATE_CHANGED') {
         setState(event.state);
@@ -160,6 +230,11 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return () => {
       clearStalledTimer();
       unsubscribe();
+      if (cleanSuspend) cleanSuspend();
+      if (cleanResume) cleanResume();
+      if (handleDeviceChange && typeof navigator !== 'undefined' && navigator.mediaDevices) {
+        navigator.mediaDevices.removeEventListener('devicechange', handleDeviceChange);
+      }
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current.src = '';
@@ -169,6 +244,31 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     };
   }, [machine]);
+
+  // Persistensi otomatis status pemutar ke SQLite
+  useEffect(() => {
+    if (window.musicApi) {
+      window.musicApi.dbSavePlayback({
+        currentTrack: state.currentTrack,
+        positionSec: state.positionSec,
+        paused: state.status !== 'playing',
+        volume: state.volume,
+        isMuted: state.isMuted,
+      }).catch(() => {});
+    }
+  }, [state.currentTrack?.id, state.status, state.volume, state.isMuted]);
+
+  useEffect(() => {
+    if (window.musicApi && state.queue.length > 0) {
+      window.musicApi.dbSaveQueue(state.queue).catch(() => {});
+    }
+  }, [state.queue]);
+
+  useEffect(() => {
+    if (state.currentTrack && state.status === 'playing' && window.musicApi) {
+      window.musicApi.dbAddHistory(state.currentTrack).catch(() => {});
+    }
+  }, [state.currentTrack?.id, state.status]);
 
   const value: PlayerContextValue = {
     state,

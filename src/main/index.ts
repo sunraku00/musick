@@ -1,9 +1,13 @@
-import { app, BrowserWindow, protocol, net } from 'electron';
+import { app, BrowserWindow, protocol, net, powerMonitor } from 'electron';
+import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
 import { bridgeManager } from './bridgeManager';
 import { SourceManager, registerIpcHandlers } from './ipcHandlers';
 import { setupSecurityPolicies } from './security';
+import { DatabaseService } from './db/database';
+
+declare const __COMMIT_HASH__: string;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -29,6 +33,7 @@ protocol.registerSchemesAsPrivileged([
 ]);
 
 let mainWindow: BrowserWindow | null = null;
+let dbService: DatabaseService | null = null;
 const sourceManager = new SourceManager();
 
 function createWindow(): void {
@@ -51,8 +56,8 @@ function createWindow(): void {
   // Terapkan kebijakan keamanan ketat
   setupSecurityPolicies(mainWindow);
 
-  // Daftarkan handler IPC bertipe
-  registerIpcHandlers(sourceManager);
+  // Daftarkan handler IPC bertipe dengan layanan database SQLite
+  registerIpcHandlers(sourceManager, dbService || undefined);
 
   const devServerUrl = process.env.VITE_DEV_SERVER_URL;
   if (devServerUrl) {
@@ -82,6 +87,50 @@ if (!gotTheLock) {
   });
 
   app.whenReady().then(() => {
+    // Inisialisasi Database SQLite di %APPDATA%\Musick\musick.db
+    const dbPath = path.join(app.getPath('userData'), 'musick.db');
+    try {
+      dbService = new DatabaseService(dbPath);
+    } catch (err) {
+      console.error('[Database Init Error]:', err);
+    }
+
+    // Tulis status diagnostik rilis (uji asap / smoke test non-sensitif)
+    try {
+      const active = sourceManager.getActiveSource();
+      const statusData = {
+        version: app.getVersion(),
+        commitHash: (typeof __COMMIT_HASH__ !== 'undefined' ? __COMMIT_HASH__ : process.env.COMMIT_HASH) || 'd3e530d',
+        isPackaged: app.isPackaged,
+        activeSourceId: active.id,
+        activeSourceName: active.name,
+        sources: sourceManager.listSources().map((s) => s.id),
+        startedAt: new Date().toISOString(),
+      };
+      fs.writeFileSync(
+        path.join(app.getPath('userData'), 'runtime-status.json'),
+        JSON.stringify(statusData, null, 2),
+        'utf-8'
+      );
+    } catch {
+      // Abaikan jika tidak dapat menulis
+    }
+
+    // Integrasi powerMonitor untuk mendeteksi siklus tidur/bangun (Sleep/Wake)
+    powerMonitor.on('suspend', () => {
+      console.log('[PowerMonitor] Komputer memasuki mode tidur (suspend)');
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('power:suspend');
+      }
+    });
+
+    powerMonitor.on('resume', () => {
+      console.log('[PowerMonitor] Komputer terbangun dari mode tidur (resume)');
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('power:resume');
+      }
+    });
+
     // Daftarkan protokol kustom app:// untuk isolasi aset lokal tanpa file://
     protocol.handle('app', (request) => {
       try {
@@ -122,6 +171,14 @@ if (!gotTheLock) {
 
   // Pembersihan pohon proses saat aplikasi keluar
   const cleanUpAndQuit = () => {
+    try {
+      if (dbService) {
+        dbService.close();
+        dbService = null;
+      }
+    } catch {
+      // Abaikan error penutupan DB
+    }
     bridgeManager.kill();
   };
 

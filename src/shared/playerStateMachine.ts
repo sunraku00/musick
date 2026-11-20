@@ -79,6 +79,37 @@ export class PlayerStateMachine {
   }
 
   /**
+   * Memulihkan antrean dan status pemutaran dari database lokal.
+   * Pemutar dipulihkan dalam keadaan JEDA (paused) sesuai PRD F2.
+   */
+  restoreState(saved: {
+    queue: Track[];
+    currentIndex: number;
+    positionSec?: number;
+    volume?: number;
+    isMuted?: boolean;
+  }): void {
+    if (!saved.queue || saved.queue.length === 0) return;
+
+    this.queue = [...saved.queue];
+    const targetIdx = Math.max(0, Math.min(saved.currentIndex, this.queue.length - 1));
+    this.currentIndex = targetIdx;
+    this.positionSec = Math.max(0, saved.positionSec || 0);
+    this.durationSec = this.queue[targetIdx]?.durationSec || 0;
+    this.status = 'paused';
+    if (typeof saved.volume === 'number') {
+      this.volume = Math.max(0, Math.min(1, saved.volume));
+    }
+    if (typeof saved.isMuted === 'boolean') {
+      this.isMuted = saved.isMuted;
+    }
+    this.retryCount = 0;
+    this.consecutiveSkips = 0;
+    this.error = null;
+    this.notifyStateChange();
+  }
+
+  /**
    * Setel antrean dan mulai memutar lagu pada indeks yang ditentukan (default: 0).
    */
   setQueue(tracks: Track[], startIndex = 0): void {

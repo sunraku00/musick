@@ -9,7 +9,7 @@ import type { SearchResult, Track } from '../../shared/types';
 const coordinator = new SearchCoordinator(new BoundedSearchCache(50));
 
 export const SearchPage: React.FC = () => {
-  const { searchQuery, setSearchQuery } = useNavigation();
+  const { searchQuery, setSearchQuery, navigateToArtist, navigateToAlbum } = useNavigation();
   const { setQueue, state: playerState } = usePlayer();
 
   const [inputVal, setInputVal] = useState<string>(searchQuery);
@@ -392,6 +392,7 @@ export const SearchPage: React.FC = () => {
                 {(activeTab === 'all' ? results.artists.slice(0, 6) : results.artists).map((artist) => (
                   <div
                     key={artist.id}
+                    onClick={() => navigateToArtist(artist.id)}
                     style={{
                       backgroundColor: '#181818',
                       padding: '16px',
@@ -400,9 +401,12 @@ export const SearchPage: React.FC = () => {
                       flexDirection: 'column',
                       alignItems: 'center',
                       textAlign: 'center',
-                      cursor: 'default',
+                      cursor: 'pointer',
                       border: '1px solid #282828',
+                      transition: 'background-color 0.15s',
                     }}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#242424')}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#181818')}
                   >
                     {artist.imageUrl ? (
                       <img
@@ -449,15 +453,19 @@ export const SearchPage: React.FC = () => {
                 {(activeTab === 'all' ? results.albums.slice(0, 6) : results.albums).map((album) => (
                   <div
                     key={album.id}
+                    onClick={() => navigateToAlbum(album.id)}
                     style={{
                       backgroundColor: '#181818',
                       padding: '16px',
                       borderRadius: '8px',
                       display: 'flex',
                       flexDirection: 'column',
-                      cursor: 'default',
+                      cursor: 'pointer',
                       border: '1px solid #282828',
+                      transition: 'background-color 0.15s',
                     }}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#242424')}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#181818')}
                   >
                     {album.coverUrl ? (
                       <img
