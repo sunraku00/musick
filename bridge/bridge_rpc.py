@@ -9,6 +9,7 @@ import json
 import re
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor
 from ytmusicapi import YTMusic
 import yt_dlp
 
@@ -19,7 +20,8 @@ ydl_resolver = None
 def get_yt():
     global yt
     if yt is None:
-        yt = YTMusic()
+        # Menggunakan lokasi 'ID' untuk mengutamakan katalog dan relevansi Indonesia
+        yt = YTMusic(location='ID')
     return yt
 
 
@@ -62,7 +64,47 @@ def handle_search(params):
         return {'query': '', 'tracks': [], 'artists': [], 'albums': []}
 
     client = get_yt()
-    raw_songs = client.search(query, filter='songs')
+
+    # Eksekusi pencarian terkelompok (Lagu, Artis, Album) secara paralel
+    raw_songs = []
+    raw_artists = []
+    raw_albums = []
+
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        f_songs = executor.submit(client.search, query, filter='songs')
+        f_artists = executor.submit(client.search, query, filter='artists')
+        f_albums = executor.submit(client.search, query, filter='albums')
+
+        try:
+            raw_songs = f_songs.result(timeout=6.0) or []
+        except Exception:
+            raw_songs = []
+
+        try:
+            raw_artists = f_artists.result(timeout=6.0) or []
+        except Exception:
+            raw_artists = []
+
+        try:
+            raw_albums = f_albums.result(timeout=6.0) or []
+        except Exception:
+            raw_albums = []
+
+    # Fallback ke pencarian umum jika ketiga filter kosong
+    if not raw_songs and not raw_artists and not raw_albums:
+        try:
+            raw_general = client.search(query)
+            for item in raw_general:
+                t = item.get('resultType')
+                if t in ('song', 'video') and item.get('videoId'):
+                    raw_songs.append(item)
+                elif t == 'artist':
+                    raw_artists.append(item)
+                elif t == 'album':
+                    raw_albums.append(item)
+        except Exception:
+            pass
+
     tracks = []
     for s in raw_songs:
         video_id = s.get('videoId')
@@ -94,12 +136,56 @@ def handle_search(params):
             'title': s.get('title', 'Unknown Title'),
             'artists': artists,
             'album': album_obj,
-            'durationSec': parse_duration_to_sec(s.get('duration', '0')),
+            'durationSec': parse_duration_to_sec(s.get('duration') or s.get('duration_seconds', 0)),
             'coverUrl': cover_url,
             'isAvailable': True,
         })
 
-    return {'query': query, 'tracks': tracks, 'artists': [], 'albums': []}
+    artists_list = []
+    for a in raw_artists:
+        artist_name = a.get('artist') or (a.get('artists') and a['artists'][0].get('name'))
+        if not artist_name:
+            artist_name = a.get('title', 'Unknown Artist')
+        browse_id = a.get('browseId', '')
+        thumbs = a.get('thumbnails', [])
+        image_url = thumbs[-1].get('url') if thumbs else ''
+        artists_list.append({
+            'id': f"ytmusic:{browse_id}" if browse_id else f"ytmusic:{artist_name}",
+            'source': 'ytmusic',
+            'sourceId': browse_id,
+            'name': artist_name,
+            'imageUrl': image_url,
+        })
+
+    albums_list = []
+    for alb in raw_albums:
+        alb_title = alb.get('title', 'Unknown Album')
+        browse_id = alb.get('browseId', '')
+        thumbs = alb.get('thumbnails', [])
+        cover_url = thumbs[-1].get('url') if thumbs else ''
+        alb_artists = []
+        for ar in alb.get('artists', []):
+            alb_artists.append({
+                'id': f"ytmusic:{ar.get('id', '')}",
+                'name': ar.get('name', 'Unknown Artist'),
+            })
+        year_val = None
+        if alb.get('year'):
+            try:
+                year_val = int(alb['year'])
+            except (ValueError, TypeError):
+                year_val = None
+        albums_list.append({
+            'id': f"ytmusic:{browse_id}" if browse_id else f"ytmusic:{alb_title}",
+            'source': 'ytmusic',
+            'sourceId': browse_id,
+            'title': alb_title,
+            'artists': alb_artists,
+            'year': year_val,
+            'coverUrl': cover_url,
+        })
+
+    return {'query': query, 'tracks': tracks, 'artists': artists_list, 'albums': albums_list}
 
 
 def handle_track(params):

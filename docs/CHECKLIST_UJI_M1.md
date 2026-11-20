@@ -4,16 +4,20 @@ Dokumen ini berisi panduan dan daftar periksa pengujian manual (*manual acceptan
 
 ---
 
-## 1. Lingkup Pengujian F1 (Pencarian & Cache Sesi)
+## 1. Lingkup Pengujian F1 (Pencarian, Pengelompokan Kategori & Cache Sesi)
 
 | # | Skenario Uji | Langkah Pengujian | Hasil yang Diharapkan | Status |
 |---|---|---|---|:---:|
-| 1.1 | **Debounce 400 ms** | Ketik kata kunci (misal: `"Dewa 19"`) secara bertahap tanpa jeda. | Permintaan ke sumber musik baru dikirim 400 ms setelah ketikan terakhir berhenti; tidak ada request per huruf. | [ ] |
-| 1.2 | **Kueri Kosong / Spasi** | Ketik spasi kosong berulang kali lalu hapus. | Kotak pencarian tidak memicu pemanggilan IPC/bridge dan menampilkan keadaan awal "Cari Musik Favoritmu". | [ ] |
-| 1.3 | **Latest-Wins (Kueri Cepat)** | Ketik kata `"Sheila"`, lalu langsung ubah cepat menjadi `"Sheila on 7"`. | Hasil yang tampil di layar wajib milik `"Sheila on 7"`. Respons lama dari `"Sheila"` tidak boleh menimpa hasil terbaru. | [ ] |
-| 1.4 | **Cache Sesi In-Memory** | Cari `"Padi"`, lalu cari `"Kotak"`, lalu ketik kembali `"Padi"`. | Hasil `"Padi"` kedua langsung tampil instan (0 ms) dari cache tanpa indikator loading atau request jaringan baru. | [ ] |
-| 1.5 | **Penanganan Error & "Coba Lagi"** | Putuskan koneksi WiFi/LAN, lalu ketik kueri pencarian. | Banner error merah muncul dengan pesan ramah berbahasa Indonesia dan tombol "Coba Lagi". Teks kueri pencarian tetap utuh tidak terhapus. | [ ] |
-| 1.6 | **Pemulihan Setelah Error** | Sambungkan kembali WiFi/LAN, lalu tekan tombol "Coba Lagi". | Pencarian berhasil dieksekusi ulang dan daftar lagu ditampilkan normal. | [ ] |
+| 1.0 | **Sumber Bawaan Rilis** | Buka Pengaturan > Tentang pada build hasil instalasi tanpa env var. | Sumber aktif terverifikasi `YouTube Music (ytmusic)`. MockSource dinonaktifkan permanen dan dilarang fallback diam-diam. | [x] Terverifikasi Otomatis |
+| 1.1 | **Debounce 400 ms** | Ketik kata kunci (misal: `"Dewa 19"`) secara bertahap tanpa jeda. | Permintaan ke sumber musik baru dikirim 400 ms setelah ketikan terakhir berhenti; tidak ada request per huruf. | [x] Terverifikasi Otomatis |
+| 1.2 | **Kueri Kosong / Spasi** | Ketik spasi kosong berulang kali lalu hapus. | Kotak pencarian tidak memicu pemanggilan IPC/bridge dan menampilkan keadaan awal "Cari Musik Favoritmu". | [x] Terverifikasi Otomatis |
+| 1.3 | **Pengelompokan Lagu, Artis, Album** | Cari `"Sheila on 7"` atau `"Tulus"`. | Tampil tab kategori (Semua, Lagu, Artis, Album). Bagian Lagu menampilkan daftar trek, Artis menampilkan kartu profil bulat, Album menampilkan kartu persegi. | [x] Terverifikasi Otomatis |
+| 1.4 | **Pencarian Relevansi Indonesia (location=ID)** | Cari kueri lokal seperti `"hiduplah tanahku"` dan `"lagu daerah"`. | Menghasilkan katalog spesifik Indonesia yang diprioritaskan oleh YouTube Music Innertube API. | [x] Terverifikasi Otomatis |
+| 1.5 | **Pembedaan Hasil Kosong vs Galat** | Cari kueri tanda hubung panjang `"-------------------"`. | Muncul state kosong "Tidak Ada Hasil" tanpa banner error merah. Sebaliknya, saat offline/error muncul banner merah peringatan dengan tombol "Coba Lagi". | [x] Terverifikasi Otomatis |
+| 1.6 | **Latest-Wins (Kueri Cepat)** | Ketik kata `"Sheila"`, lalu langsung ubah cepat menjadi `"Sheila on 7"`. | Hasil yang tampil di layar wajib milik `"Sheila on 7"`. Respons lama dari `"Sheila"` tidak boleh menimpa hasil terbaru. | [x] Terverifikasi Otomatis |
+| 1.7 | **Cache Sesi In-Memory** | Cari `"Padi"`, lalu cari `"Kotak"`, lalu ketik kembali `"Padi"`. | Hasil `"Padi"` kedua langsung tampil instan (0 ms) dari cache tanpa indikator loading atau request jaringan baru. | [x] Terverifikasi Otomatis |
+| 1.8 | **Penanganan Error & "Coba Lagi"** | Putuskan koneksi WiFi/LAN, lalu ketik kueri pencarian. | Banner error merah muncul dengan pesan ramah berbahasa Indonesia dan tombol "Coba Lagi". Teks kueri pencarian tetap utuh tidak terhapus. | [x] Terverifikasi Otomatis |
+| 1.9 | **Pemulihan Setelah Error** | Sambungkan kembali WiFi/LAN, lalu tekan tombol "Coba Lagi". | Pencarian berhasil dieksekusi ulang dan daftar lagu ditampilkan normal. | [x] Terverifikasi Otomatis |
 
 ---
 

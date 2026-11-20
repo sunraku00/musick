@@ -71,6 +71,9 @@ export const SearchPage: React.FC = () => {
       return;
     }
 
+    // Set loading indicator saat mengetik kueri baru agar UI responsif seketika
+    setIsLoading(true);
+
     debounceTimerRef.current = setTimeout(() => {
       setSearchQuery(inputVal);
       executeSearch(inputVal);
@@ -206,9 +209,9 @@ export const SearchPage: React.FC = () => {
         </div>
       )}
 
-      {/* State Kosong: Tidak Ada Hasil */}
-      {!isLoading && results && results.tracks.length === 0 && !errorMessage && (
-        <div style={{ textAlign: 'center', padding: '60px 0' }}>
+      {/* State Kosong: Tidak Ada Hasil (Lagu, Artis, dan Album Semuanya 0) */}
+      {!isLoading && results && results.tracks.length === 0 && results.artists.length === 0 && results.albums.length === 0 && !errorMessage && (
+        <div id="search-no-results" data-query={results.query} style={{ textAlign: 'center', padding: '60px 0' }}>
           <h3 style={{ fontSize: '16px', color: '#ffffff', margin: '0 0 6px 0' }}>
             {ID_STRINGS.search.noResultsTitle}
           </h3>
@@ -218,89 +221,279 @@ export const SearchPage: React.FC = () => {
         </div>
       )}
 
-      {/* Daftar Hasil Trek */}
-      {!isLoading && results && results.tracks.length > 0 && (
-        <section>
-          <h3 style={{ fontSize: '16px', color: '#ffffff', margin: '0 0 16px 0' }}>
+      {/* Tab Navigasi Kategori (Semua, Lagu, Artis, Album) sesuai PRD F1 */}
+      {!isLoading && results && (results.tracks.length > 0 || results.artists.length > 0 || results.albums.length > 0) && (
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '24px' }}>
+          <button
+            id="tab-all"
+            onClick={() => setActiveTab('all')}
+            style={{
+              padding: '6px 14px',
+              borderRadius: '500px',
+              backgroundColor: activeTab === 'all' ? '#ffffff' : '#242424',
+              color: activeTab === 'all' ? '#000000' : '#ffffff',
+              border: 'none',
+              fontSize: '13px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              transition: 'background-color 0.15s',
+            }}
+          >
+            {ID_STRINGS.search.tabAll}
+          </button>
+          <button
+            id="tab-tracks"
+            onClick={() => setActiveTab('tracks')}
+            style={{
+              padding: '6px 14px',
+              borderRadius: '500px',
+              backgroundColor: activeTab === 'tracks' ? '#ffffff' : '#242424',
+              color: activeTab === 'tracks' ? '#000000' : '#ffffff',
+              border: 'none',
+              fontSize: '13px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              transition: 'background-color 0.15s',
+            }}
+          >
             {ID_STRINGS.search.tabTracks} ({results.tracks.length})
-          </h3>
+          </button>
+          <button
+            id="tab-artists"
+            onClick={() => setActiveTab('artists')}
+            style={{
+              padding: '6px 14px',
+              borderRadius: '500px',
+              backgroundColor: activeTab === 'artists' ? '#ffffff' : '#242424',
+              color: activeTab === 'artists' ? '#000000' : '#ffffff',
+              border: 'none',
+              fontSize: '13px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              transition: 'background-color 0.15s',
+            }}
+          >
+            {ID_STRINGS.search.tabArtists} ({results.artists.length})
+          </button>
+          <button
+            id="tab-albums"
+            onClick={() => setActiveTab('albums')}
+            style={{
+              padding: '6px 14px',
+              borderRadius: '500px',
+              backgroundColor: activeTab === 'albums' ? '#ffffff' : '#242424',
+              color: activeTab === 'albums' ? '#000000' : '#ffffff',
+              border: 'none',
+              fontSize: '13px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              transition: 'background-color 0.15s',
+            }}
+          >
+            {ID_STRINGS.search.tabAlbums} ({results.albums.length})
+          </button>
+        </div>
+      )}
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            {results.tracks.map((track, idx) => {
-              const isCurrent = playerState.currentTrack?.id === track.id;
-              return (
-                <div
-                  key={track.id}
-                  onClick={() => handleTrackClick(track, idx)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '8px 12px',
-                    borderRadius: '4px',
-                    backgroundColor: isCurrent ? '#282828' : 'transparent',
-                    cursor: 'pointer',
-                    transition: 'background-color 0.1s',
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isCurrent) e.currentTarget.style.backgroundColor = '#181818';
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isCurrent) e.currentTarget.style.backgroundColor = 'transparent';
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                    <span style={{ fontSize: '13px', color: isCurrent ? '#1db954' : '#777777', width: '20px' }}>
-                      {isCurrent ? '▶' : idx + 1}
-                    </span>
+      {/* Bagian Hasil Terkelompok (PRD F1) */}
+      {!isLoading && results && (
+        <div id="search-results-container" data-query={results.query} style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+          {/* Kelompok Lagu */}
+          {(activeTab === 'all' || activeTab === 'tracks') && results.tracks.length > 0 && (
+            <section id="section-tracks">
+              <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#ffffff', margin: '0 0 16px 0' }}>
+                {ID_STRINGS.search.tabTracks} ({results.tracks.length})
+              </h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                {(activeTab === 'all' ? results.tracks.slice(0, 8) : results.tracks).map((track, idx) => {
+                  const isCurrent = playerState.currentTrack?.id === track.id;
+                  return (
+                    <div
+                      key={track.id}
+                      onClick={() => handleTrackClick(track, idx)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '8px 12px',
+                        borderRadius: '4px',
+                        backgroundColor: isCurrent ? '#282828' : 'transparent',
+                        cursor: 'pointer',
+                        transition: 'background-color 0.1s',
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!isCurrent) e.currentTarget.style.backgroundColor = '#181818';
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isCurrent) e.currentTarget.style.backgroundColor = 'transparent';
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                        <span style={{ fontSize: '13px', color: isCurrent ? '#1db954' : '#777777', width: '20px' }}>
+                          {isCurrent ? '▶' : idx + 1}
+                        </span>
 
-                    {track.coverUrl ? (
+                        {track.coverUrl ? (
+                          <img
+                            src={track.coverUrl}
+                            alt={track.title}
+                            style={{ width: '40px', height: '40px', borderRadius: '4px', objectFit: 'cover' }}
+                          />
+                        ) : (
+                          <div
+                            style={{
+                              width: '40px',
+                              height: '40px',
+                              borderRadius: '4px',
+                              backgroundColor: '#282828',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: '#777777',
+                            }}
+                          >
+                            🎵
+                          </div>
+                        )}
+
+                        <div>
+                          <div
+                            style={{
+                              fontSize: '14px',
+                              fontWeight: 500,
+                              color: isCurrent ? '#1db954' : '#ffffff',
+                            }}
+                          >
+                            {track.title}
+                          </div>
+                          <div style={{ fontSize: '12px', color: '#b3b3b3', marginTop: '2px' }}>
+                            {track.artists.map((a) => a.name).join(', ')}
+                          </div>
+                        </div>
+                      </div>
+
+                      <span style={{ fontSize: '12px', color: '#b3b3b3' }}>
+                        {track.durationSec ? `${Math.floor(track.durationSec / 60)}:${(track.durationSec % 60).toString().padStart(2, '0')}` : '--:--'}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
+          {/* Kelompok Artis */}
+          {(activeTab === 'all' || activeTab === 'artists') && results.artists.length > 0 && (
+            <section id="section-artists">
+              <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#ffffff', margin: '0 0 16px 0' }}>
+                {ID_STRINGS.search.tabArtists} ({results.artists.length})
+              </h3>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '16px' }}>
+                {(activeTab === 'all' ? results.artists.slice(0, 6) : results.artists).map((artist) => (
+                  <div
+                    key={artist.id}
+                    style={{
+                      backgroundColor: '#181818',
+                      padding: '16px',
+                      borderRadius: '8px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      textAlign: 'center',
+                      cursor: 'default',
+                      border: '1px solid #282828',
+                    }}
+                  >
+                    {artist.imageUrl ? (
                       <img
-                        src={track.coverUrl}
-                        alt={track.title}
-                        style={{ width: '40px', height: '40px', borderRadius: '4px', objectFit: 'cover' }}
+                        src={artist.imageUrl}
+                        alt={artist.name}
+                        style={{ width: '96px', height: '96px', borderRadius: '50%', objectFit: 'cover', marginBottom: '12px' }}
                       />
                     ) : (
                       <div
                         style={{
-                          width: '40px',
-                          height: '40px',
+                          width: '96px',
+                          height: '96px',
+                          borderRadius: '50%',
+                          backgroundColor: '#282828',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '32px',
+                          marginBottom: '12px',
+                        }}
+                      >
+                        👤
+                      </div>
+                    )}
+                    <div style={{ fontSize: '14px', fontWeight: 600, color: '#ffffff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%' }}>
+                      {artist.name}
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#888888', marginTop: '4px' }}>
+                      {ID_STRINGS.search.tabArtists}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* Kelompok Album */}
+          {(activeTab === 'all' || activeTab === 'albums') && results.albums.length > 0 && (
+            <section id="section-albums">
+              <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#ffffff', margin: '0 0 16px 0' }}>
+                {ID_STRINGS.search.tabAlbums} ({results.albums.length})
+              </h3>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '16px' }}>
+                {(activeTab === 'all' ? results.albums.slice(0, 6) : results.albums).map((album) => (
+                  <div
+                    key={album.id}
+                    style={{
+                      backgroundColor: '#181818',
+                      padding: '16px',
+                      borderRadius: '8px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      cursor: 'default',
+                      border: '1px solid #282828',
+                    }}
+                  >
+                    {album.coverUrl ? (
+                      <img
+                        src={album.coverUrl}
+                        alt={album.title}
+                        style={{ width: '100%', aspectRatio: '1/1', borderRadius: '4px', objectFit: 'cover', marginBottom: '12px' }}
+                      />
+                    ) : (
+                      <div
+                        style={{
+                          width: '100%',
+                          aspectRatio: '1/1',
                           borderRadius: '4px',
                           backgroundColor: '#282828',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          color: '#777777',
+                          fontSize: '32px',
+                          marginBottom: '12px',
                         }}
                       >
-                        🎵
+                        💿
                       </div>
                     )}
-
-                    <div>
-                      <div
-                        style={{
-                          fontSize: '14px',
-                          fontWeight: 500,
-                          color: isCurrent ? '#1db954' : '#ffffff',
-                        }}
-                      >
-                        {track.title}
-                      </div>
-                      <div style={{ fontSize: '12px', color: '#b3b3b3', marginTop: '2px' }}>
-                        {track.artists.map((a) => a.name).join(', ')}
-                      </div>
+                    <div style={{ fontSize: '14px', fontWeight: 600, color: '#ffffff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {album.title}
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#888888', marginTop: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {album.year ? `${album.year} • ` : ''}{album.artists?.map((a) => a.name).join(', ') || 'Album'}
                     </div>
                   </div>
-
-                  <span style={{ fontSize: '12px', color: '#b3b3b3' }}>
-                    {track.durationSec ? `${Math.floor(track.durationSec / 60)}:${(track.durationSec % 60).toString().padStart(2, '0')}` : '--:--'}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </section>
+                ))}
+              </div>
+            </section>
+          )}
+        </div>
       )}
     </div>
   );

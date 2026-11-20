@@ -86,8 +86,11 @@ async def run_full_benchmark():
             # ---------------------------------------------------------
             # KONDISI B: Bridge Aktif Diam (Setelah Pencarian)
             # ---------------------------------------------------------
-            print("\n>>> MENGAKTIFKAN BRIDGE DAN PENCARIAN...")
-            await evaluate("window.musicApi.setActiveSource('ytmusic')", await_promise=True)
+            print("\n>>> MEMERIKSA SUMBER BAWAAN DAN MENGAKTIFKAN PENCARIAN...")
+            active_src = await evaluate("window.musicApi.getActiveSource()", await_promise=True)
+            if active_src != "ytmusic":
+                raise RuntimeError(f"Celah terdeteksi: Sumber bawaan bukan 'ytmusic' melainkan '{active_src}'!")
+            print(f"Sumber bawaan terverifikasi: '{active_src}' (OK)")
             search_res = await evaluate("window.musicApi.search('Sheila on 7')", await_promise=True)
             track_id = search_res['tracks'][0]['id']
             print(f"Hasil pencarian: {len(search_res['tracks'])} trek. Trek pertama: {track_id}")

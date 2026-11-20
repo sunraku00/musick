@@ -46,11 +46,16 @@ async def main():
 
         print(f"Terhubung ke CDP WebSocket: {target_ws_url}")
         async with websockets.connect(target_ws_url) as ws:
-            # Set active source to ytmusic
-            await cdp_call(ws, "Runtime.evaluate", {
-                "expression": "window.musicApi.setActiveSource('ytmusic')",
-                "awaitPromise": True
+            # Verifikasi sumber bawaan adalah ytmusic (tanpa memaksa setActiveSource)
+            src_res = await cdp_call(ws, "Runtime.evaluate", {
+                "expression": "window.musicApi.getActiveSource()",
+                "awaitPromise": True,
+                "returnByValue": True
             }, req_id=1)
+            active_src = src_res.get("result", {}).get("result", {}).get("value")
+            if active_src != "ytmusic":
+                raise RuntimeError(f"Celah terdeteksi: Sumber bawaan bukan 'ytmusic' melainkan '{active_src}'!")
+            print(f"Sumber bawaan terverifikasi: '{active_src}' (OK)")
 
             # Inisialisasi pemutaran lagu Sheila On 7 (ID: k1BfsO0mxWQ)
             init_script = """

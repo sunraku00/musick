@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron';
+import { app, ipcMain } from 'electron';
 import { MusicSourceError, type MusicSourceErrorPayload } from '../shared/errors';
 import { IPC_CHANNELS } from '../shared/ipc';
 import type { MusicSource } from '../shared/source';
@@ -6,15 +6,47 @@ import type { SourceMeta } from '../shared/types';
 import { MockSource } from './adapters/mock/mockSource';
 import { YtMusicSource } from './adapters/ytmusic/ytmusicSource';
 
+export interface SourceManagerOptions {
+  readonly isPackaged?: boolean;
+  readonly defaultSource?: string;
+  readonly envSource?: string;
+}
+
 export class SourceManager {
   private sources: Map<string, MusicSource> = new Map();
-  private activeSourceId: string = 'mock';
+  private activeSourceId: string;
+  private readonly isPackaged: boolean;
 
-  constructor() {
-    const mock = new MockSource();
+  constructor(options?: SourceManagerOptions) {
+    let packaged = false;
+    try {
+      packaged = options?.isPackaged ?? (app ? app.isPackaged : process.env.NODE_ENV === 'production');
+    } catch {
+      packaged = options?.isPackaged ?? (process.env.NODE_ENV === 'production');
+    }
+    this.isPackaged = Boolean(packaged);
+
+    const envSource = options?.envSource ?? process.env.MUSICK_SOURCE;
+
+    // Sumber YouTube Music selalu terpasang sebagai sumber utama
     const ytmusic = new YtMusicSource();
-    this.sources.set(mock.id, mock);
     this.sources.set(ytmusic.id, ytmusic);
+
+    // MockSource HANYA diizinkan jika sedang development (!isPackaged) ATAU jika env MUSICK_SOURCE=mock
+    const allowMock = !this.isPackaged || envSource === 'mock';
+    if (allowMock) {
+      const mock = new MockSource();
+      this.sources.set(mock.id, mock);
+    }
+
+    // Default sumber bawaan rilis HARUS ytmusic! Dilarang fallback diam-diam ke MockSource.
+    if (envSource === 'mock' && allowMock) {
+      this.activeSourceId = 'mock';
+    } else if (options?.defaultSource && this.sources.has(options.defaultSource)) {
+      this.activeSourceId = options.defaultSource;
+    } else {
+      this.activeSourceId = 'ytmusic';
+    }
   }
 
   getActiveSource(): MusicSource {
@@ -26,8 +58,11 @@ export class SourceManager {
   }
 
   setActiveSource(id: string): void {
+    if (this.isPackaged && id === 'mock' && process.env.MUSICK_SOURCE !== 'mock') {
+      throw new MusicSourceError('UNAVAILABLE', 'Sumber Mock dinonaktifkan pada build rilis');
+    }
     if (!this.sources.has(id)) {
-      throw new MusicSourceError('UNAVAILABLE', `Sumber '${id}' tidak valid`);
+      throw new MusicSourceError('UNAVAILABLE', `Sumber '${id}' tidak valid atau tidak terpasang`);
     }
     this.activeSourceId = id;
   }

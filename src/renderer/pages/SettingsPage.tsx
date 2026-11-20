@@ -1,8 +1,27 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ID_STRINGS } from '../../shared/i18n/id';
 
 export const SettingsPage: React.FC = () => {
   const [audioQuality, setAudioQuality] = useState<'economy' | 'high'>('economy');
+  const [activeSourceName, setActiveSourceName] = useState<string>('Memuat...');
+
+  useEffect(() => {
+    const fetchSource = async () => {
+      try {
+        if (window.musicApi) {
+          const [activeId, sources] = await Promise.all([
+            window.musicApi.getActiveSource(),
+            window.musicApi.listSources(),
+          ]);
+          const match = sources.find((s) => s.id === activeId);
+          setActiveSourceName(match ? `${match.name} (${activeId})` : (activeId || 'YouTube Music'));
+        }
+      } catch {
+        setActiveSourceName('YouTube Music (ytmusic)');
+      }
+    };
+    fetchSource();
+  }, []);
 
   return (
     <div style={{ padding: '36px 32px', maxWidth: '800px', margin: '0 auto' }}>
@@ -68,8 +87,11 @@ export const SettingsPage: React.FC = () => {
           {ID_STRINGS.settings.privacyText}
         </p>
 
-        <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid #282828', fontSize: '12px', color: '#777777' }}>
-          Musick v0.1.0 • Desktop Windows 64-bit • Dibangun dengan Electron + React
+        <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid #282828', fontSize: '12px', color: '#777777', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <div>Musick v0.1.0 • Desktop Windows 64-bit • Dibangun dengan Electron + React</div>
+          <div id="active-source-badge" style={{ color: '#1db954', fontWeight: 500 }}>
+            Sumber musik aktif: {activeSourceName}
+          </div>
         </div>
       </section>
     </div>

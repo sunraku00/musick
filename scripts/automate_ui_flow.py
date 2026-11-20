@@ -59,11 +59,16 @@ async def main():
         async with websockets.connect(target_ws_url) as ws:
             await asyncio.sleep(1.5)
 
-            # Set sumber aktif ke ytmusic
-            await cdp_call(ws, "Runtime.evaluate", {
-                "expression": "window.musicApi.setActiveSource('ytmusic')",
-                "awaitPromise": True
+            # Verifikasi sumber bawaan adalah ytmusic (tanpa memaksa setActiveSource)
+            source_check = await cdp_call(ws, "Runtime.evaluate", {
+                "expression": "window.musicApi.getActiveSource()",
+                "awaitPromise": True,
+                "returnByValue": True
             }, req_id=100)
+            active_src = source_check if isinstance(source_check, str) else source_check.get("result", {}).get("result", {}).get("value")
+            if active_src != "ytmusic":
+                raise RuntimeError(f"Celah terdeteksi: Sumber bawaan bukan 'ytmusic' melainkan '{active_src}'!")
+            print(f"Verifikasi sumber bawaan: '{active_src}' (OK)")
 
             # Langkah 1: Ketik kata kunci di kolom Cari
             print("Langkah 1: Mengetik 'Sheila on 7' pada kolom Cari...")
