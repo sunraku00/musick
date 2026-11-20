@@ -105,7 +105,7 @@ export class YtMusicSource implements MusicSource {
       return cached;
     }
 
-    await this.throttle();
+    // CATATAN B3: resolveStream TIDAK menggunakan this.throttle() agar tidak tertahan di belakang pencarian
     const streamInfo = await this.bridge.resolveStream(cleanId);
     if (!streamInfo || !streamInfo.url) {
       throw new MusicSourceError('UNAVAILABLE', 'Alamat stream audio tidak ditemukan');

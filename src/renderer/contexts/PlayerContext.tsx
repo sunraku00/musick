@@ -15,6 +15,9 @@ interface PlayerContextValue {
   previous: () => void;
   next: () => void;
   setQueue: (tracks: Track[], startIndex?: number) => void;
+  playTrack: (track: Track, queueContext?: Track[]) => void;
+  retryPlay: () => void;
+  showToast: (msg: string) => void;
 }
 
 const PlayerContext = createContext<PlayerContextValue | null>(null);
@@ -234,7 +237,18 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           const api = window.musicApi;
           if (!api) throw new Error('API musicApi tidak tersedia');
 
-          const stream = await api.resolveStream(event.track.sourceId || event.track.id);
+          // Batas waktu resolve maksimal 8 detik (Tambahan B3)
+          let timeoutHandle: NodeJS.Timeout;
+          const resolvePromise = api.resolveStream(event.track.sourceId || event.track.id);
+          const timeoutPromise = new Promise<never>((_, reject) => {
+            timeoutHandle = setTimeout(() => {
+              reject(new Error('Waktu penyelesaian stream audio melebihi batas 8 detik'));
+            }, 8000);
+          });
+
+          const stream = await Promise.race([resolvePromise, timeoutPromise]);
+          clearTimeout(timeoutHandle!);
+
           if (audioRef.current) {
             audioRef.current.src = stream.url;
             if (event.startPositionSec > 0) {
@@ -244,8 +258,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             machine.onStreamResolved();
           }
         } catch (err: any) {
-          const code = err?.code || 'NETWORK';
-          const msg = err?.message || 'Gagal menyelesaikan alamat stream';
+          const code = err?.code || 'TIMEOUT';
+          const msg = err?.message || 'Gagal menyelesaikan alamat stream (melebihi 8 detik)';
           console.warn('[PlayerContext] Gagal resolve stream:', code, msg);
           machine.handleStreamError(code, msg);
         }
@@ -275,6 +289,23 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     };
   }, [machine]);
+
+  // Prefetch stream lagu berikutnya di antrean saat lagu sekarang memutar (Tambahan B3)
+  const prefetchedTrackIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (state.status === 'playing' && state.currentTrack && state.queue.length > 0) {
+      const nextIndex = state.currentIndex + 1;
+      if (nextIndex < state.queue.length) {
+        const nextTrack = state.queue[nextIndex];
+        const nextId = nextTrack.sourceId || nextTrack.id;
+        if (nextId && prefetchedTrackIdRef.current !== nextId) {
+          prefetchedTrackIdRef.current = nextId;
+          // Prefetch satu lagu ke depan di latar belakang ke memory cache
+          window.musicApi?.resolveStream(nextId).catch(() => {});
+        }
+      }
+    }
+  }, [state.currentTrack?.id, state.status, state.currentIndex, state.queue]);
 
   // Persistensi otomatis status pemutar ke SQLite
   useEffect(() => {
@@ -313,6 +344,25 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     previous: () => machine.previous(),
     next: () => machine.next(),
     setQueue: (tracks: Track[], startIndex = 0) => machine.setQueue(tracks, startIndex),
+    playTrack: (track: Track, queueContext?: Track[]) => {
+      if (queueContext && queueContext.length > 0) {
+        const idx = queueContext.findIndex((t) => t.id === track.id);
+        machine.setQueue(queueContext, idx >= 0 ? idx : 0);
+      } else {
+        machine.setQueue([track], 0);
+      }
+    },
+    retryPlay: () => {
+      if (state.currentIndex >= 0 && state.currentIndex < state.queue.length) {
+        machine.playIndex(state.currentIndex);
+      } else {
+        machine.play();
+      }
+    },
+    showToast: (msg: string) => {
+      setToastMessage(msg);
+      setTimeout(() => setToastMessage(null), 3000);
+    },
   };
 
   return <PlayerContext.Provider value={value}>{children}</PlayerContext.Provider>;

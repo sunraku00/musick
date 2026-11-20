@@ -12,7 +12,7 @@ function formatDuration(sec?: number): string {
 
 export const PlaylistPage: React.FC = () => {
   const { selectedPlaylistId, navigateTo, triggerPlaylistRefresh, playlistRefreshKey } = useNavigation();
-  const { playTrack, showToast } = usePlayer();
+  const { playTrack, showToast, state: playerState } = usePlayer();
   const [playlist, setPlaylist] = useState<PlaylistDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -141,43 +141,59 @@ export const PlaylistPage: React.FC = () => {
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          {playlist.tracks.map((track) => (
-            <div
-              key={track.playlistTrackId}
-              className="track-row"
-              onClick={() => playTrack(track, playlist.tracks)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                padding: '10px 16px',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                backgroundColor: 'transparent',
-                transition: 'background-color 0.15s',
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#1f1f1f')}
-              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-            >
-              <div style={{ width: '32px', fontSize: '13px', color: '#777777' }}>
-                {track.position}
-              </div>
-
-              {track.coverUrl && (
-                <img
-                  src={track.coverUrl}
-                  alt={track.title}
-                  style={{ width: '40px', height: '40px', borderRadius: '4px', marginRight: '14px', objectFit: 'cover' }}
-                />
-              )}
-
-              <div style={{ flex: 1, minWidth: 0, marginRight: '16px' }}>
-                <div style={{ fontSize: '14px', fontWeight: 600, color: '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {track.title}
+          {playlist.tracks.map((track) => {
+            const isCurrent = playerState.currentTrack?.id === track.id;
+            const isTrackLoading = isCurrent && playerState.status === 'loading';
+            return (
+              <div
+                key={track.playlistTrackId}
+                className="track-row"
+                onClick={() => playTrack(track, playlist.tracks)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '10px 16px',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  backgroundColor: isCurrent ? '#242424' : 'transparent',
+                  transition: 'background-color 0.15s',
+                }}
+                onMouseEnter={(e) => {
+                  if (!isCurrent) e.currentTarget.style.backgroundColor = '#1f1f1f';
+                }}
+                onMouseLeave={(e) => {
+                  if (!isCurrent) e.currentTarget.style.backgroundColor = 'transparent';
+                }}
+              >
+                <div style={{ width: '32px', fontSize: '13px', color: isCurrent ? '#1db954' : '#777777' }}>
+                  {isTrackLoading ? '⏳' : isCurrent ? '▶' : track.position}
                 </div>
-                <div style={{ fontSize: '12px', color: '#b3b3b3', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: '2px' }}>
-                  {track.artists?.map((a) => a.name).join(', ') || 'Artis Tidak Diketahui'}
+
+                {track.coverUrl && (
+                  <img
+                    src={track.coverUrl}
+                    alt={track.title}
+                    loading="lazy"
+                    decoding="async"
+                    width={40}
+                    height={40}
+                    style={{ width: '40px', height: '40px', borderRadius: '4px', marginRight: '14px', objectFit: 'cover' }}
+                  />
+                )}
+
+                <div style={{ flex: 1, minWidth: 0, marginRight: '16px' }}>
+                  <div style={{ fontSize: '14px', fontWeight: 600, color: isCurrent ? '#1db954' : '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{track.title}</span>
+                    {isTrackLoading && (
+                      <span style={{ fontSize: '11px', color: '#1db954', fontWeight: 600, flexShrink: 0 }}>
+                        Memuat...
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#b3b3b3', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: '2px' }}>
+                    {track.artists?.map((a) => a.name).join(', ') || 'Artis Tidak Diketahui'}
+                  </div>
                 </div>
-              </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                 <button
@@ -202,7 +218,8 @@ export const PlaylistPage: React.FC = () => {
                 </div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

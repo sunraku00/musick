@@ -11,8 +11,8 @@ function formatTime(seconds: number): string {
 }
 
 export const PlayerBar: React.FC = () => {
-  const { state, togglePlay, seek, setVolume, toggleMute, previous, next, showToast } = usePlayer();
-  const { currentTrack, status, positionSec, durationSec, volume, isMuted } = state;
+  const { state, togglePlay, pause, seek, setVolume, toggleMute, previous, next, retryPlay, showToast } = usePlayer();
+  const { currentTrack, status, positionSec, durationSec, volume, isMuted, error } = state;
 
   const [isLiked, setIsLiked] = useState(false);
   const [isPlaylistModalOpen, setIsPlaylistModalOpen] = useState(false);
@@ -57,11 +57,15 @@ export const PlayerBar: React.FC = () => {
       }}
     >
       {/* Kiri: Info Lagu & Tombol Like/Playlist */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '14px', width: '300px', minWidth: '180px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '14px', width: '320px', minWidth: '180px' }}>
         {currentTrack?.coverUrl ? (
           <img
             src={currentTrack.coverUrl}
             alt={currentTrack.title}
+            loading="lazy"
+            decoding="async"
+            width={52}
+            height={52}
             style={{ width: '52px', height: '52px', borderRadius: '4px', objectFit: 'cover' }}
           />
         ) : (
@@ -91,10 +95,20 @@ export const PlayerBar: React.FC = () => {
               whiteSpace: 'nowrap',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
             }}
             title={currentTrack?.title}
           >
-            {currentTrack?.title || ID_STRINGS.player.unknownTitle}
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {currentTrack?.title || ID_STRINGS.player.unknownTitle}
+            </span>
+            {status === 'loading' && (
+              <span id="playerbar-loading-badge" style={{ fontSize: '11px', color: '#1db954', fontWeight: 500, flexShrink: 0 }}>
+                ⏳ Memuat...
+              </span>
+            )}
           </div>
           <div
             style={{
@@ -109,6 +123,27 @@ export const PlayerBar: React.FC = () => {
           >
             {currentTrack?.artists?.map((a) => a.name).join(', ') || ID_STRINGS.player.unknownArtist}
           </div>
+          {status === 'error' && error && (
+            <div id="playerbar-error-badge" style={{ color: '#ff6b6b', fontSize: '11px', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span>{error.message}</span>
+              <button
+                id="btn-retry-playback"
+                onClick={retryPlay}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#1db954',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  textDecoration: 'underline',
+                  padding: 0,
+                }}
+              >
+                Coba lagi
+              </button>
+            </div>
+          )}
         </div>
 
         {currentTrack && (
@@ -187,11 +222,19 @@ export const PlayerBar: React.FC = () => {
             ⏮
           </button>
 
-          {/* Tombol Putar / Jeda */}
+          {/* Tombol Putar / Jeda / Batal Memuat */}
           <button
-            onClick={togglePlay}
+            id="btn-play-pause"
+            onClick={() => {
+              if (status === 'loading') {
+                pause(); // Batalkan pemuatan
+              } else {
+                togglePlay();
+              }
+            }}
             disabled={!currentTrack && state.queue.length === 0}
-            aria-label={isPlaying ? ID_STRINGS.player.pause : ID_STRINGS.player.play}
+            aria-label={status === 'loading' ? 'Batalkan pemuatan' : isPlaying ? ID_STRINGS.player.pause : ID_STRINGS.player.play}
+            title={status === 'loading' ? 'Klik untuk membatalkan pemuatan' : isPlaying ? 'Jeda' : 'Putar'}
             style={{
               width: '38px',
               height: '38px',
@@ -209,7 +252,7 @@ export const PlayerBar: React.FC = () => {
             onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.06)')}
             onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
           >
-            {isPlaying ? '⏸' : '▶'}
+            {status === 'loading' ? '⏳' : isPlaying ? '⏸' : '▶'}
           </button>
 
           {/* Tombol Berikutnya */}

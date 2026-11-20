@@ -40,16 +40,26 @@ def get_yt():
 def get_ydl():
     global ydl_resolver
     if ydl_resolver is None:
+        # Opsi yt-dlp yang dioptimasi seminimal mungkin (B3):
+        # 1. player_client: ['android_music'] -> mengambil format audio langsung tanpa unduh player JavaScript/n-sig
+        # 2. noplaylist: True -> hanya mengekstrak 1 video, tidak menelusuri playlist
+        # 3. check_formats: False -> mematikan pemeriksaan HEAD request ke setiap format URL
+        # 4. skip_download: True -> hanya mengekstrak URL stream tanpa mengunduh data media
         ydl_opts = {
             'format': 'bestaudio/best',
             'quiet': True,
             'no_warnings': True,
             'extract_flat': False,
             'skip_download': True,
-            # Tidak menggunakan cookie browser atau kredensial akun
+            'noplaylist': True,
+            'check_formats': False,
             'no_cookies': True,
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['android_music']
+                }
+            }
         }
-
         ydl_resolver = yt_dlp.YoutubeDL(ydl_opts)
     return ydl_resolver
 
@@ -238,7 +248,20 @@ def handle_resolve(params):
 
     ydl = get_ydl()
     watch_url = f"https://www.youtube.com/watch?v={source_id}"
-    info = ydl.extract_info(watch_url, download=False)
+    try:
+        info = ydl.extract_info(watch_url, download=False)
+    except Exception:
+        fallback_opts = {
+            'format': 'bestaudio/best',
+            'quiet': True,
+            'no_warnings': True,
+            'skip_download': True,
+            'noplaylist': True,
+            'no_cookies': True,
+        }
+        fallback_ydl = yt_dlp.YoutubeDL(fallback_opts)
+        info = fallback_ydl.extract_info(watch_url, download=False)
+
     stream_url = info.get('url')
     if not stream_url:
         raise LookupError('Alamat stream audio tidak ditemukan')

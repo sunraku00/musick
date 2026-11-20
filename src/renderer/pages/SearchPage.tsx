@@ -9,6 +9,124 @@ import type { SearchResult, Track } from '../../shared/types';
 
 const coordinator = new SearchCoordinator(new BoundedSearchCache(50));
 
+interface TrackRowItemProps {
+  track: Track;
+  idx: number;
+  isCurrent: boolean;
+  isLoading: boolean;
+  onPlay: () => void;
+  onAddToPlaylist: () => void;
+}
+
+const TrackRowItem = React.memo<TrackRowItemProps>(({ track, idx, isCurrent, isLoading, onPlay, onAddToPlaylist }) => {
+  return (
+    <div
+      onClick={onPlay}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '8px 12px',
+        borderRadius: '4px',
+        backgroundColor: isCurrent ? '#282828' : 'transparent',
+        cursor: 'pointer',
+        transition: 'background-color 0.1s',
+      }}
+      onMouseEnter={(e) => {
+        if (!isCurrent) e.currentTarget.style.backgroundColor = '#181818';
+      }}
+      onMouseLeave={(e) => {
+        if (!isCurrent) e.currentTarget.style.backgroundColor = 'transparent';
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: 1, minWidth: 0, marginRight: '16px' }}>
+        <span style={{ fontSize: '13px', color: isCurrent ? '#1db954' : '#777777', width: '20px', flexShrink: 0 }}>
+          {isLoading ? '⏳' : isCurrent ? '▶' : idx + 1}
+        </span>
+
+        {track.coverUrl ? (
+          <img
+            src={track.coverUrl}
+            alt={track.title}
+            loading="lazy"
+            decoding="async"
+            width={40}
+            height={40}
+            style={{ width: '40px', height: '40px', borderRadius: '4px', objectFit: 'cover', flexShrink: 0 }}
+          />
+        ) : (
+          <div
+            style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: '4px',
+              backgroundColor: '#282828',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#777777',
+              flexShrink: 0,
+            }}
+          >
+            🎵
+          </div>
+        )}
+
+        <div style={{ overflow: 'hidden' }}>
+          <div
+            style={{
+              fontSize: '14px',
+              fontWeight: 500,
+              color: isCurrent ? '#1db954' : '#ffffff',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+            }}
+          >
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{track.title}</span>
+            {isLoading && (
+              <span style={{ fontSize: '11px', color: '#1db954', fontWeight: 600, flexShrink: 0 }}>
+                ⏳ Memuat...
+              </span>
+            )}
+          </div>
+          <div style={{ fontSize: '12px', color: '#b3b3b3', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {track.artists.map((a) => a.name).join(', ')}
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
+        <button
+          title="Tambah ke Playlist"
+          onClick={(e) => {
+            e.stopPropagation();
+            onAddToPlaylist();
+          }}
+          style={{
+            background: 'none',
+            border: 'none',
+            fontSize: '14px',
+            color: '#888888',
+            cursor: 'pointer',
+            padding: '4px',
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.color = '#ffffff')}
+          onMouseLeave={(e) => (e.currentTarget.style.color = '#888888')}
+        >
+          ➕
+        </button>
+        <span style={{ fontSize: '12px', color: '#b3b3b3' }}>
+          {track.durationSec ? `${Math.floor(track.durationSec / 60)}:${(track.durationSec % 60).toString().padStart(2, '0')}` : '--:--'}
+        </span>
+      </div>
+    </div>
+  );
+});
+
 export const SearchPage: React.FC = () => {
   const { searchQuery, setSearchQuery, navigateToArtist, navigateToAlbum } = useNavigation();
   const { setQueue, state: playerState } = usePlayer();
@@ -45,6 +163,9 @@ export const SearchPage: React.FC = () => {
         setIsLoading(false);
       }
     } catch (err: any) {
+      if (err?.code === 'SUPERSEDED' || err?.message?.includes('SUPERSEDED')) {
+        return;
+      }
       setIsLoading(false);
       let userMsg = ID_STRINGS.errors.generic;
 
@@ -336,100 +457,17 @@ export const SearchPage: React.FC = () => {
                 {ID_STRINGS.search.tabTracks} ({results.tracks.length})
               </h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                {(activeTab === 'all' ? results.tracks.slice(0, 8) : results.tracks).map((track, idx) => {
-                  const isCurrent = playerState.currentTrack?.id === track.id;
-                  return (
-                    <div
-                      key={track.id}
-                      onClick={() => handleTrackClick(track, idx)}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '8px 12px',
-                        borderRadius: '4px',
-                        backgroundColor: isCurrent ? '#282828' : 'transparent',
-                        cursor: 'pointer',
-                        transition: 'background-color 0.1s',
-                      }}
-                      onMouseEnter={(e) => {
-                        if (!isCurrent) e.currentTarget.style.backgroundColor = '#181818';
-                      }}
-                      onMouseLeave={(e) => {
-                        if (!isCurrent) e.currentTarget.style.backgroundColor = 'transparent';
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                        <span style={{ fontSize: '13px', color: isCurrent ? '#1db954' : '#777777', width: '20px' }}>
-                          {isCurrent ? '▶' : idx + 1}
-                        </span>
-
-                        {track.coverUrl ? (
-                          <img
-                            src={track.coverUrl}
-                            alt={track.title}
-                            style={{ width: '40px', height: '40px', borderRadius: '4px', objectFit: 'cover' }}
-                          />
-                        ) : (
-                          <div
-                            style={{
-                              width: '40px',
-                              height: '40px',
-                              borderRadius: '4px',
-                              backgroundColor: '#282828',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              color: '#777777',
-                            }}
-                          >
-                            🎵
-                          </div>
-                        )}
-
-                        <div>
-                          <div
-                            style={{
-                              fontSize: '14px',
-                              fontWeight: 500,
-                              color: isCurrent ? '#1db954' : '#ffffff',
-                            }}
-                          >
-                            {track.title}
-                          </div>
-                          <div style={{ fontSize: '12px', color: '#b3b3b3', marginTop: '2px' }}>
-                            {track.artists.map((a) => a.name).join(', ')}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <button
-                          title="Tambah ke Playlist"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setModalTrack(track);
-                          }}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            fontSize: '14px',
-                            color: '#888888',
-                            cursor: 'pointer',
-                            padding: '4px',
-                          }}
-                          onMouseEnter={(e) => (e.currentTarget.style.color = '#ffffff')}
-                          onMouseLeave={(e) => (e.currentTarget.style.color = '#888888')}
-                        >
-                          ➕
-                        </button>
-                        <span style={{ fontSize: '12px', color: '#b3b3b3' }}>
-                          {track.durationSec ? `${Math.floor(track.durationSec / 60)}:${(track.durationSec % 60).toString().padStart(2, '0')}` : '--:--'}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
+                {(activeTab === 'all' ? results.tracks.slice(0, 8) : results.tracks).map((track, idx) => (
+                  <TrackRowItem
+                    key={track.id}
+                    track={track}
+                    idx={idx}
+                    isCurrent={playerState.currentTrack?.id === track.id}
+                    isLoading={playerState.status === 'loading' && playerState.currentTrack?.id === track.id}
+                    onPlay={() => handleTrackClick(track, idx)}
+                    onAddToPlaylist={() => setModalTrack(track)}
+                  />
+                ))}
               </div>
             </section>
           )}
@@ -464,6 +502,10 @@ export const SearchPage: React.FC = () => {
                       <img
                         src={artist.imageUrl}
                         alt={artist.name}
+                        loading="lazy"
+                        decoding="async"
+                        width={96}
+                        height={96}
                         style={{ width: '96px', height: '96px', borderRadius: '50%', objectFit: 'cover', marginBottom: '12px' }}
                       />
                     ) : (
@@ -523,6 +565,10 @@ export const SearchPage: React.FC = () => {
                       <img
                         src={album.coverUrl}
                         alt={album.title}
+                        loading="lazy"
+                        decoding="async"
+                        width={140}
+                        height={140}
                         style={{ width: '100%', aspectRatio: '1/1', borderRadius: '4px', objectFit: 'cover', marginBottom: '12px' }}
                       />
                     ) : (

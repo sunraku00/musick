@@ -15,6 +15,17 @@ interface PendingRequest {
   timeoutId: NodeJS.Timeout;
 }
 
+interface QueuedRequest {
+  id: number;
+  method: string;
+  params: Record<string, unknown>;
+  priority: 'high' | 'normal';
+  timeoutMs: number;
+  resolve: (value: any) => void;
+  reject: (reason: any) => void;
+  enqueuedAt: number;
+}
+
 export interface BridgeManagerOptions {
   scriptPath?: string;
   pythonPath?: string;
@@ -23,16 +34,19 @@ export interface BridgeManagerOptions {
 }
 
 /**
- * Pengelola proses anak Python Bridge dengan mekanisme "Malas" (Lazy Spawning):
- * 1. Hanya dijalankan saat ada permintaan pertama (search / resolve).
- * 2. Dimatikan otomatis setelah diam selama idleTimeoutMs (default 5 menit) untuk menghemat RAM.
- * 3. Dihidupkan kembali seketika saat dibutuhkan.
+ * Pengelola proses anak Python Bridge dengan antrean prioritas dan lazy spawning:
+ * 1. Prioritas tinggi untuk resolve / putar musik; prioritas normal untuk pencarian.
+ * 2. Pencarian lama yang masih mengantre otomatis dibuang (discarded/cancelled) saat kueri baru masuk.
+ * 3. Permintaan dikirim 1-per-1 ke stdin Python untuk mencegah penumpukan (head-of-line blocking).
+ * 4. Dimatikan otomatis setelah diam selama idleTimeoutMs (default 5 menit) untuk menghemat RAM.
  */
 export class BridgeManager {
   private child: ChildProcess | null = null;
   private rl: readline.Interface | null = null;
   private nextId = 1;
   private pending = new Map<number, PendingRequest>();
+  private queue: QueuedRequest[] = [];
+  private isExecuting = false;
   private isShuttingDown = false;
   private restartAttempts = 0;
   private scriptPath: string;
@@ -92,19 +106,20 @@ export class BridgeManager {
     this.clearIdleTimer();
     console.log(`[BridgeManager] Memulai Python bridge (eksekusi: ${this.pythonPath})...`);
 
-    this.child = spawn(this.pythonPath, [this.scriptPath], {
+    const child = spawn(this.pythonPath, [this.scriptPath], {
       stdio: ['pipe', 'pipe', 'pipe'],
       windowsHide: true,
       env: {
         ...process.env,
       },
     });
+    this.child = child;
 
-    const pid = this.child.pid;
+    const pid = child.pid;
     console.log(`[BridgeManager] Bridge Python aktif (PID: ${pid})`);
 
     this.rl = readline.createInterface({
-      input: this.child.stdout!,
+      input: child.stdout!,
       crlfDelay: Infinity,
     });
 
@@ -112,29 +127,23 @@ export class BridgeManager {
       this.handleLine(line);
     });
 
-    this.child.stderr?.on('data', (data) => {
+    child.stderr?.on('data', (data) => {
       console.warn(`[Bridge Python STDERR]: ${data.toString().trim()}`);
     });
 
-    this.child.on('close', (code, signal) => {
+    child.on('close', (code, signal) => {
       console.log(`[BridgeManager] Bridge Python berhenti (code: ${code}, signal: ${signal})`);
-      this.cleanupChild();
+      if (this.child === child) {
+        const hadPending = this.pending.size > 0;
+        this.cleanupChild();
 
-      for (const [, req] of this.pending) {
-        clearTimeout(req.timeoutId);
-        req.reject(new MusicSourceError('NETWORK', 'Bridge Python terhenti'));
-      }
-      this.pending.clear();
-
-      if (!this.isShuttingDown) {
-        // Jika mati secara abnormal dan masih ada pending, jadwalkan restart
-        if (this.pending.size > 0) {
+        if (!this.isShuttingDown && hadPending) {
           this.scheduleRestart();
         }
       }
     });
 
-    this.child.on('error', (err) => {
+    child.on('error', (err) => {
       console.error('[BridgeManager] Gagal spawn proses python:', err);
     });
 
@@ -167,15 +176,20 @@ export class BridgeManager {
    */
   stopIdle(): void {
     this.clearIdleTimer();
-    if (!this.child) return;
+    const child = this.child;
+    if (!child) return;
 
-    const pid = this.child.pid;
+    this.child = null;
+    child.removeAllListeners('close');
+    child.removeAllListeners('error');
+
+    const pid = child.pid;
     console.log(`[BridgeManager] Mematikan proses idle (PID: ${pid})...`);
     try {
       if (process.platform === 'win32' && pid) {
         execSync(`taskkill /pid ${pid} /T /F`, { stdio: 'ignore' });
       } else {
-        this.child.kill('SIGTERM');
+        child.kill('SIGTERM');
       }
     } catch {
       // Abaikan jika sudah keluar
@@ -201,6 +215,16 @@ export class BridgeManager {
       this.rl = null;
     }
     this.child = null;
+    this.isExecuting = false;
+    for (const [, req] of this.pending) {
+      clearTimeout(req.timeoutId);
+      req.reject(new MusicSourceError('NETWORK', 'Bridge Python terhenti'));
+    }
+    this.pending.clear();
+    for (const req of this.queue) {
+      req.reject(new MusicSourceError('NETWORK', 'Bridge Python terhenti'));
+    }
+    this.queue = [];
   }
 
   private handleLine(line: string): void {
@@ -213,6 +237,7 @@ export class BridgeManager {
 
       this.pending.delete(reqId);
       clearTimeout(pending.timeoutId);
+      this.isExecuting = false;
 
       if (resp.error) {
         const code = resp.error.code || 'NETWORK';
@@ -222,59 +247,120 @@ export class BridgeManager {
       }
     } catch (err) {
       console.error('[BridgeManager] Gagal parse respon RPC:', line, err);
+      this.isExecuting = false;
     } finally {
-      if (this.pending.size === 0) {
+      this.processQueue();
+      if (this.pending.size === 0 && this.queue.length === 0) {
         this.resetIdleTimer();
       }
     }
   }
 
   async call<T>(method: string, params: Record<string, unknown> = {}, timeoutMs = 25000): Promise<T> {
-    // Lazily start bridge if not running
+    const priority = method === 'resolve' || method === 'health' ? 'high' : 'normal';
+
+    // 1. Buang pencarian lama yang belum terkirim jika ada kueri pencarian baru (stale search discard)
+    if (method === 'search') {
+      this.queue = this.queue.filter((item) => {
+        if (item.method === 'search') {
+          item.reject(new MusicSourceError('SUPERSEDED', 'Pencarian dibatalkan karena kueri digantikan'));
+          return false;
+        }
+        return true;
+      });
+    }
+
+    const id = this.nextId++;
+
+    return new Promise<T>((resolve, reject) => {
+      const req: QueuedRequest = {
+        id,
+        method,
+        params,
+        priority,
+        timeoutMs,
+        resolve,
+        reject,
+        enqueuedAt: Date.now(),
+      };
+
+      if (priority === 'high') {
+        // Sisipkan di posisi terdepan antrean (sebelum request prioritas normal)
+        const insertIdx = this.queue.findIndex((q) => q.priority !== 'high');
+        if (insertIdx === -1) {
+          this.queue.push(req);
+        } else {
+          this.queue.splice(insertIdx, 0, req);
+        }
+      } else {
+        this.queue.push(req);
+      }
+
+      this.processQueue();
+    });
+  }
+
+  private processQueue(): void {
+    if (this.isExecuting || this.queue.length === 0 || this.isShuttingDown) return;
+
     if (!this.isRunning() || !this.child?.stdin?.writable) {
       this.start();
       if (!this.child || !this.child.stdin?.writable) {
-        throw new MusicSourceError('NETWORK', 'Bridge Python tidak dapat dimulai');
+        const nextReq = this.queue.shift();
+        nextReq?.reject(new MusicSourceError('NETWORK', 'Bridge Python tidak dapat dimulai'));
+        return;
       }
     }
 
+    const req = this.queue.shift()!;
+    this.isExecuting = true;
     this.clearIdleTimer();
 
-    const id = this.nextId++;
-    const payload = JSON.stringify({ id, method, params }) + '\n';
+    const payload = JSON.stringify({ id: req.id, method: req.method, params: req.params }) + '\n';
 
-    return new Promise<T>((resolve, reject) => {
-      const timeoutId = setTimeout(() => {
-        this.pending.delete(id);
-        if (this.pending.size === 0) this.resetIdleTimer();
-        reject(new MusicSourceError('NETWORK', `Waktu permintaan RPC ${method} habis (${timeoutMs}ms)`));
-      }, timeoutMs);
+    const timeoutId = setTimeout(() => {
+      this.pending.delete(req.id);
+      this.isExecuting = false;
+      if (this.pending.size === 0 && this.queue.length === 0) this.resetIdleTimer();
+      req.reject(new MusicSourceError('NETWORK', `Waktu permintaan RPC ${req.method} habis (${req.timeoutMs}ms)`));
+      this.processQueue();
+    }, req.timeoutMs);
 
-      this.pending.set(id, { resolve, reject, timeoutId });
-
-      try {
-        this.child!.stdin!.write(payload);
-      } catch (err) {
-        clearTimeout(timeoutId);
-        this.pending.delete(id);
-        if (this.pending.size === 0) this.resetIdleTimer();
-        reject(new MusicSourceError('NETWORK', `Gagal menulis ke stdin bridge: ${err}`));
-      }
+    this.pending.set(req.id, {
+      resolve: req.resolve,
+      reject: req.reject,
+      timeoutId,
     });
+
+    try {
+      this.child!.stdin!.write(payload);
+    } catch (err) {
+      clearTimeout(timeoutId);
+      this.pending.delete(req.id);
+      this.isExecuting = false;
+      if (this.pending.size === 0 && this.queue.length === 0) this.resetIdleTimer();
+      req.reject(new MusicSourceError('NETWORK', `Gagal menulis ke stdin bridge: ${err}`));
+      this.processQueue();
+    }
   }
 
   kill(): void {
     this.isShuttingDown = true;
     this.clearIdleTimer();
-    if (!this.child) return;
+    const child = this.child;
+    if (!child) return;
 
-    const pid = this.child.pid;
+    this.child = null;
+    child.removeAllListeners('close');
+    child.removeAllListeners('error');
+
+    const pid = child.pid;
     console.log(`[BridgeManager] Mematikan pohon proses bridge permanen (PID: ${pid})...`);
     try {
       if (process.platform === 'win32' && pid) {
         execSync(`taskkill /pid ${pid} /T /F`, { stdio: 'ignore' });
       } else {
-        this.child.kill('SIGKILL');
+        child.kill('SIGKILL');
       }
     } catch {
       // Abaikan jika sudah keluar
