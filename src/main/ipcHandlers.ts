@@ -140,11 +140,11 @@ export function registerIpcHandlers(
   });
 
   handleIpc(IPC_CHANNELS.GET_APP_INFO, async (): Promise<AppInfo> => {
-    let ver = '0.1.3';
+    let ver = '0.2.0';
     try {
       ver = app.getVersion();
     } catch {
-      ver = '0.1.3';
+      ver = '0.2.0';
     }
     return {
       version: ver,
@@ -203,5 +203,44 @@ export function registerIpcHandlers(
       return getBlockerStatus();
     }
     return { active: false, blockerId: null, settingEnabled: true };
+  });
+
+  // Handler Liked Songs & Playlist Core (M2.1)
+  handleIpc(IPC_CHANNELS.DB_TOGGLE_LIKE_TRACK, async (track: Track) => {
+    return dbService ? dbService.toggleLikeTrack(track) : false;
+  });
+
+  handleIpc(IPC_CHANNELS.DB_IS_TRACK_LIKED, async (trackId: string) => {
+    return dbService ? dbService.isTrackLiked(trackId) : false;
+  });
+
+  handleIpc(IPC_CHANNELS.DB_GET_LIKED_TRACKS, async () => {
+    return dbService ? dbService.getLikedTracks() : [];
+  });
+
+  handleIpc(IPC_CHANNELS.DB_CREATE_PLAYLIST, async (name: string, description?: string) => {
+    if (!dbService) throw new Error('Database tidak tersedia');
+    return dbService.createPlaylist(name, description);
+  });
+
+  handleIpc(IPC_CHANNELS.DB_GET_PLAYLISTS, async () => {
+    return dbService ? dbService.getPlaylists() : [];
+  });
+
+  handleIpc(IPC_CHANNELS.DB_GET_PLAYLIST, async (playlistId: number) => {
+    return dbService ? dbService.getPlaylist(playlistId) : null;
+  });
+
+  handleIpc(IPC_CHANNELS.DB_ADD_TRACK_TO_PLAYLIST, async (playlistId: number, track: Track) => {
+    if (!dbService) throw new Error('Database tidak tersedia');
+    return dbService.addTrackToPlaylist(playlistId, track);
+  });
+
+  handleIpc(IPC_CHANNELS.DB_REMOVE_TRACK_FROM_PLAYLIST, async (playlistTrackId: number) => {
+    if (dbService) dbService.removeTrackFromPlaylist(playlistTrackId);
+  });
+
+  handleIpc(IPC_CHANNELS.DB_DELETE_PLAYLIST, async (playlistId: number) => {
+    if (dbService) dbService.deletePlaylist(playlistId);
   });
 }

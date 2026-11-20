@@ -1,4 +1,4 @@
-import type { Album, Artist, SearchResult, SourceMeta, StreamInfo, Track } from './types';
+import type { Album, Artist, Playlist, PlaylistDetails, SearchResult, SourceMeta, StreamInfo, Track } from './types';
 
 export const IPC_CHANNELS = {
   SEARCH: 'music:search',
@@ -21,6 +21,15 @@ export const IPC_CHANNELS = {
   DB_CLEAR_ALL_HISTORY: 'db:clear-all-history',
   POWER_SET_PLAYBACK_ACTIVE: 'power:set-playback-active',
   POWER_GET_BLOCKER_STATUS: 'power:get-blocker-status',
+  DB_TOGGLE_LIKE_TRACK: 'db:toggle-like-track',
+  DB_IS_TRACK_LIKED: 'db:is-track-liked',
+  DB_GET_LIKED_TRACKS: 'db:get-liked-tracks',
+  DB_CREATE_PLAYLIST: 'db:create-playlist',
+  DB_GET_PLAYLISTS: 'db:get-playlists',
+  DB_GET_PLAYLIST: 'db:get-playlist',
+  DB_ADD_TRACK_TO_PLAYLIST: 'db:add-track-to-playlist',
+  DB_REMOVE_TRACK_FROM_PLAYLIST: 'db:remove-track-from-playlist',
+  DB_DELETE_PLAYLIST: 'db:delete-playlist',
 } as const;
 
 export interface PowerBlockerStatus {
@@ -68,6 +77,15 @@ export interface MusicApi {
   dbClearAllHistory(): Promise<ClearHistoryResult>;
   setPowerSaveBlocker(isPlaying: boolean): Promise<void>;
   getPowerSaveBlockerStatus(): Promise<PowerBlockerStatus>;
+  dbToggleLikeTrack(track: Track): Promise<boolean>;
+  dbIsTrackLiked(trackId: string): Promise<boolean>;
+  dbGetLikedTracks(): Promise<Track[]>;
+  dbCreatePlaylist(name: string, description?: string): Promise<Playlist>;
+  dbGetPlaylists(): Promise<Playlist[]>;
+  dbGetPlaylist(playlistId: number): Promise<PlaylistDetails | null>;
+  dbAddTrackToPlaylist(playlistId: number, track: Track): Promise<{ added: boolean; isDuplicate: boolean; playlistTrackId: number }>;
+  dbRemoveTrackFromPlaylist(playlistTrackId: number): Promise<void>;
+  dbDeletePlaylist(playlistId: number): Promise<void>;
   onSuspend(callback: () => void): () => void;
   onResume(callback: () => void): () => void;
 }

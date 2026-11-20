@@ -8,6 +8,8 @@ import { SearchPage } from './pages/SearchPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { ArtistPage } from './pages/ArtistPage';
 import { AlbumPage } from './pages/AlbumPage';
+import { LikedSongsPage } from './pages/LikedSongsPage';
+import { PlaylistPage } from './pages/PlaylistPage';
 
 const AppContent: React.FC = () => {
   const { currentPage } = useNavigation();
@@ -127,6 +129,8 @@ const AppContent: React.FC = () => {
           {currentPage === 'settings' && <SettingsPage />}
           {currentPage === 'artist' && <ArtistPage />}
           {currentPage === 'album' && <AlbumPage />}
+          {currentPage === 'liked-songs' && <LikedSongsPage />}
+          {currentPage === 'playlist' && <PlaylistPage />}
         </main>
       </div>
 

@@ -65,3 +65,22 @@ export interface SourceMeta {
   readonly id: string;
   readonly name: string;
 }
+
+export interface Playlist {
+  readonly id: number;
+  readonly name: string;
+  readonly description?: string;
+  readonly trackCount: number;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
+export interface PlaylistTrackItem extends Track {
+  readonly playlistTrackId: number;
+  readonly position: number;
+  readonly addedAt: string;
+}
+
+export interface PlaylistDetails extends Playlist {
+  readonly tracks: readonly PlaylistTrackItem[];
+}

@@ -33,8 +33,8 @@ describe('DatabaseService (node:sqlite) Hardening & Tests', () => {
     fs.rmSync(tempDir, { recursive: true, force: true });
   });
 
-  it('menginisialisasi schema_meta dengan versi 1 dan mengaktifkan WAL/FK', () => {
-    expect(dbService.getSchemaVersion()).toBe(1);
+  it('menginisialisasi schema_meta dengan versi 2 dan mengaktifkan WAL/FK', () => {
+    expect(dbService.getSchemaVersion()).toBe(2);
   });
 
   it('membuat cadangan otomatis .bak saat database yang ada dibuka kembali', () => {

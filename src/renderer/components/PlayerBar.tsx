@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { usePlayer } from '../contexts/PlayerContext';
 import { ID_STRINGS } from '../../shared/i18n/id';
+import { AddToPlaylistModal } from './PlaylistModal';
 
 function formatTime(seconds: number): string {
   if (isNaN(seconds) || seconds < 0) return '0:00';
@@ -10,8 +11,32 @@ function formatTime(seconds: number): string {
 }
 
 export const PlayerBar: React.FC = () => {
-  const { state, togglePlay, seek, setVolume, toggleMute, previous, next } = usePlayer();
+  const { state, togglePlay, seek, setVolume, toggleMute, previous, next, showToast } = usePlayer();
   const { currentTrack, status, positionSec, durationSec, volume, isMuted } = state;
+
+  const [isLiked, setIsLiked] = useState(false);
+  const [isPlaylistModalOpen, setIsPlaylistModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (currentTrack) {
+      window.musicApi.dbIsTrackLiked(currentTrack.id).then((liked) => {
+        setIsLiked(liked);
+      }).catch(() => setIsLiked(false));
+    } else {
+      setIsLiked(false);
+    }
+  }, [currentTrack]);
+
+  const handleToggleLike = async () => {
+    if (!currentTrack) return;
+    try {
+      const nowLiked = await window.musicApi.dbToggleLikeTrack(currentTrack);
+      setIsLiked(nowLiked);
+      showToast(nowLiked ? 'Disimpan ke Lagu yang Disukai' : 'Dihapus dari Lagu yang Disukai');
+    } catch (err) {
+      console.error('Gagal toggle like:', err);
+    }
+  };
 
   const isPlaying = status === 'playing';
   const effectiveDuration = durationSec || currentTrack?.durationSec || 0;
@@ -31,8 +56,8 @@ export const PlayerBar: React.FC = () => {
         zIndex: 100,
       }}
     >
-      {/* Kiri: Info Lagu */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '14px', width: '280px', minWidth: '180px' }}>
+      {/* Kiri: Info Lagu & Tombol Like/Playlist */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '14px', width: '300px', minWidth: '180px' }}>
         {currentTrack?.coverUrl ? (
           <img
             src={currentTrack.coverUrl}
@@ -57,7 +82,7 @@ export const PlayerBar: React.FC = () => {
           </div>
         )}
 
-        <div style={{ overflow: 'hidden' }}>
+        <div style={{ overflow: 'hidden', flex: 1 }}>
           <div
             style={{
               color: '#ffffff',
@@ -85,6 +110,45 @@ export const PlayerBar: React.FC = () => {
             {currentTrack?.artists?.map((a) => a.name).join(', ') || ID_STRINGS.player.unknownArtist}
           </div>
         </div>
+
+        {currentTrack && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <button
+              id="btn-toggle-like"
+              title={isLiked ? 'Hapus dari Lagu Disukai' : 'Suka lagu ini'}
+              onClick={handleToggleLike}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: isLiked ? '#e2264d' : '#888888',
+                fontSize: '16px',
+                cursor: 'pointer',
+                padding: '4px',
+                transition: 'transform 0.1s, color 0.15s',
+              }}
+            >
+              {isLiked ? '❤️' : '🤍'}
+            </button>
+
+            <button
+              id="btn-add-to-playlist"
+              title="Tambah ke Playlist"
+              onClick={() => setIsPlaylistModalOpen(true)}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#888888',
+                fontSize: '15px',
+                cursor: 'pointer',
+                padding: '4px',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = '#ffffff')}
+              onMouseLeave={(e) => (e.currentTarget.style.color = '#888888')}
+            >
+              ➕
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Tengah: Kontrol Pemutar & Slider Posisi */}
@@ -139,13 +203,13 @@ export const PlayerBar: React.FC = () => {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              cursor: 'pointer',
+              cursor: currentTrack || state.queue.length > 0 ? 'pointer' : 'default',
               transition: 'transform 0.1s, background-color 0.15s',
             }}
             onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.06)')}
             onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
           >
-            {status === 'loading' ? '⏳' : isPlaying ? '⏸' : '▶'}
+            {isPlaying ? '⏸' : '▶'}
           </button>
 
           {/* Tombol Berikutnya */}
@@ -173,9 +237,9 @@ export const PlayerBar: React.FC = () => {
           </button>
         </div>
 
-        {/* Progress Bar & Waktu */}
+        {/* Track Bar (Scrubber) */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%' }}>
-          <span style={{ fontSize: '11px', color: '#b3b3b3', width: '35px', textAlign: 'right' }}>
+          <span style={{ fontSize: '11px', color: '#b3b3b3', width: '38px', textAlign: 'right' }}>
             {formatTime(positionSec)}
           </span>
 
@@ -186,27 +250,28 @@ export const PlayerBar: React.FC = () => {
             value={positionSec}
             onChange={(e) => seek(Number(e.target.value))}
             disabled={!currentTrack}
-            aria-label={ID_STRINGS.player.trackPosition}
             style={{
               flex: 1,
               height: '4px',
+              appearance: 'none',
+              backgroundColor: '#4d4d4d',
               borderRadius: '2px',
-              accentColor: '#1db954',
+              outline: 'none',
               cursor: currentTrack ? 'pointer' : 'default',
+              accentColor: '#1db954',
             }}
           />
 
-          <span style={{ fontSize: '11px', color: '#b3b3b3', width: '35px' }}>
+          <span style={{ fontSize: '11px', color: '#b3b3b3', width: '38px' }}>
             {formatTime(effectiveDuration)}
           </span>
         </div>
       </div>
 
-      {/* Kanan: Slider Volume & Mute */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '200px', justifyContent: 'flex-end' }}>
+      {/* Kanan: Kontrol Volume */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '180px', justifyContent: 'flex-end' }}>
         <button
           onClick={toggleMute}
-          aria-label={isMuted ? ID_STRINGS.player.unmute : ID_STRINGS.player.mute}
           style={{
             background: 'none',
             border: 'none',
@@ -215,7 +280,7 @@ export const PlayerBar: React.FC = () => {
             cursor: 'pointer',
             padding: '4px',
           }}
-          title={isMuted ? 'Bunyikan' : 'Bisukan'}
+          title={isMuted ? 'Nyalakan Suara (M)' : 'Bisukan Suara (M)'}
         >
           {isMuted || volume === 0 ? '🔇' : volume < 0.5 ? '🔉' : '🔊'}
         </button>
@@ -227,16 +292,29 @@ export const PlayerBar: React.FC = () => {
           step={0.01}
           value={isMuted ? 0 : volume}
           onChange={(e) => setVolume(Number(e.target.value))}
-          aria-label={ID_STRINGS.player.volume}
           style={{
             width: '90px',
             height: '4px',
+            appearance: 'none',
+            backgroundColor: '#4d4d4d',
             borderRadius: '2px',
-            accentColor: '#1db954',
+            outline: 'none',
             cursor: 'pointer',
+            accentColor: '#1db954',
           }}
         />
       </div>
+
+      {isPlaylistModalOpen && currentTrack && (
+        <AddToPlaylistModal
+          track={currentTrack}
+          isOpen={true}
+          onClose={() => setIsPlaylistModalOpen(false)}
+          onSuccess={(pName, isDup) => {
+            showToast(isDup ? `Lagu ditambahkan ke ${pName} (duplikat)` : `Lagu ditambahkan ke ${pName}`);
+          }}
+        />
+      )}
     </footer>
   );
 };

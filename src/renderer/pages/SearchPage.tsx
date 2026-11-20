@@ -3,6 +3,7 @@ import { useNavigation } from '../contexts/NavigationContext';
 import { usePlayer } from '../contexts/PlayerContext';
 import { BoundedSearchCache, SearchCoordinator } from '../utils/searchManager';
 import { ID_STRINGS } from '../../shared/i18n/id';
+import { AddToPlaylistModal } from '../components/PlaylistModal';
 import { MusicSourceError } from '../../shared/errors';
 import type { SearchResult, Track } from '../../shared/types';
 
@@ -17,6 +18,7 @@ export const SearchPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'all' | 'tracks' | 'artists' | 'albums'>('all');
+  const [modalTrack, setModalTrack] = useState<Track | null>(null);
 
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -401,9 +403,30 @@ export const SearchPage: React.FC = () => {
                         </div>
                       </div>
 
-                      <span style={{ fontSize: '12px', color: '#b3b3b3' }}>
-                        {track.durationSec ? `${Math.floor(track.durationSec / 60)}:${(track.durationSec % 60).toString().padStart(2, '0')}` : '--:--'}
-                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <button
+                          title="Tambah ke Playlist"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setModalTrack(track);
+                          }}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            fontSize: '14px',
+                            color: '#888888',
+                            cursor: 'pointer',
+                            padding: '4px',
+                          }}
+                          onMouseEnter={(e) => (e.currentTarget.style.color = '#ffffff')}
+                          onMouseLeave={(e) => (e.currentTarget.style.color = '#888888')}
+                        >
+                          ➕
+                        </button>
+                        <span style={{ fontSize: '12px', color: '#b3b3b3' }}>
+                          {track.durationSec ? `${Math.floor(track.durationSec / 60)}:${(track.durationSec % 60).toString().padStart(2, '0')}` : '--:--'}
+                        </span>
+                      </div>
                     </div>
                   );
                 })}
@@ -531,6 +554,17 @@ export const SearchPage: React.FC = () => {
             </section>
           )}
         </div>
+      )}
+
+      {modalTrack && (
+        <AddToPlaylistModal
+          track={modalTrack}
+          isOpen={true}
+          onClose={() => setModalTrack(null)}
+          onSuccess={(pName, isDup) => {
+            alert(isDup ? `Lagu ditambahkan ke ${pName} (duplikat)` : `Lagu ditambahkan ke ${pName}`);
+          }}
+        />
       )}
     </div>
   );

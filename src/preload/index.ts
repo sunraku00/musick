@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { MusicSourceError, type MusicSourceErrorPayload } from '../shared/errors';
 import { IPC_CHANNELS, type AppInfo, type ClearHistoryResult, type MusicApi, type PowerBlockerStatus, type SavedPlayback } from '../shared/ipc';
-import type { Album, Artist, SearchResult, SourceMeta, StreamInfo, Track } from '../shared/types';
+import type { Album, Artist, Playlist, PlaylistDetails, SearchResult, SourceMeta, StreamInfo, Track } from '../shared/types';
 
 interface IpcResult<T> {
   success: boolean;
@@ -80,6 +80,33 @@ const api: MusicApi = {
   },
   getPowerSaveBlockerStatus: (): Promise<PowerBlockerStatus> => {
     return invokeIpc<PowerBlockerStatus>(IPC_CHANNELS.POWER_GET_BLOCKER_STATUS);
+  },
+  dbToggleLikeTrack: (track: Track): Promise<boolean> => {
+    return invokeIpc<boolean>(IPC_CHANNELS.DB_TOGGLE_LIKE_TRACK, track);
+  },
+  dbIsTrackLiked: (trackId: string): Promise<boolean> => {
+    return invokeIpc<boolean>(IPC_CHANNELS.DB_IS_TRACK_LIKED, trackId);
+  },
+  dbGetLikedTracks: (): Promise<Track[]> => {
+    return invokeIpc<Track[]>(IPC_CHANNELS.DB_GET_LIKED_TRACKS);
+  },
+  dbCreatePlaylist: (name: string, description?: string): Promise<Playlist> => {
+    return invokeIpc<Playlist>(IPC_CHANNELS.DB_CREATE_PLAYLIST, name, description);
+  },
+  dbGetPlaylists: (): Promise<Playlist[]> => {
+    return invokeIpc<Playlist[]>(IPC_CHANNELS.DB_GET_PLAYLISTS);
+  },
+  dbGetPlaylist: (playlistId: number): Promise<PlaylistDetails | null> => {
+    return invokeIpc<PlaylistDetails | null>(IPC_CHANNELS.DB_GET_PLAYLIST, playlistId);
+  },
+  dbAddTrackToPlaylist: (playlistId: number, track: Track): Promise<{ added: boolean; isDuplicate: boolean; playlistTrackId: number }> => {
+    return invokeIpc<{ added: boolean; isDuplicate: boolean; playlistTrackId: number }>(IPC_CHANNELS.DB_ADD_TRACK_TO_PLAYLIST, playlistId, track);
+  },
+  dbRemoveTrackFromPlaylist: (playlistTrackId: number): Promise<void> => {
+    return invokeIpc<void>(IPC_CHANNELS.DB_REMOVE_TRACK_FROM_PLAYLIST, playlistTrackId);
+  },
+  dbDeletePlaylist: (playlistId: number): Promise<void> => {
+    return invokeIpc<void>(IPC_CHANNELS.DB_DELETE_PLAYLIST, playlistId);
   },
   onSuspend: (callback: () => void): (() => void) => {
     const handler = () => callback();
