@@ -51,16 +51,20 @@ async def kill_bridge_process():
 
 def get_musick_memory():
     ps_cmd = """
-    $procs = Get-Process -Name Musick, python -ErrorAction SilentlyContinue | Where-Object { 
-        $_.ProcessName -eq 'Musick' -or ($_.CommandLine -match 'bridge_rpc.py') 
+    $musickProcs = Get-Process -Name Musick -ErrorAction SilentlyContinue
+    $musickWs = ($musickProcs | Measure-Object -Property WorkingSet64 -Sum).Sum / 1MB
+    
+    $pyCim = Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match 'bridge_rpc.py' }
+    $pyWs = 0
+    if ($pyCim) {
+        $pyWs = ($pyCim | ForEach-Object { (Get-Process -Id $_.ProcessId -ErrorAction SilentlyContinue).WorkingSet64 } | Measure-Object -Sum).Sum / 1MB
     }
-    $totalWs = ($procs | Measure-Object -Property WorkingSet64 -Sum).Sum / 1MB
-    $musickWs = ($procs | Where-Object { $_.ProcessName -eq 'Musick' } | Measure-Object -Property WorkingSet64 -Sum).Sum / 1MB
-    $pythonWs = ($procs | Where-Object { $_.ProcessName -eq 'python' } | Measure-Object -Property WorkingSet64 -Sum).Sum / 1MB
+    
+    $totalWs = $musickWs + $pyWs
     [PSCustomObject]@{
         TotalMB = [math]::Round($totalWs, 1)
         MusickMB = [math]::Round($musickWs, 1)
-        PythonMB = [math]::Round($pythonWs, 1)
+        PythonMB = [math]::Round($pyWs, 1)
     } | ConvertTo-Json
     """
     res = subprocess.run(["powershell", "-NoProfile", "-Command", ps_cmd], capture_output=True, text=True)
@@ -142,7 +146,6 @@ async def main():
             const tStart = performance.now();
             
             // Tembakkan 5 search secara cepat berturut-turut
-            const searchResults = [];
             const searchPromises = queries.map(q => 
                 window.musicApi.search(q)
                     .then(res => ({ q, status: 'fulfilled', count: res.tracks.length }))
@@ -176,51 +179,51 @@ async def main():
         req_id += 1
         q_result = await cdp_eval(ws, queue_test_js, req_id)
         print(f"Hasil Uji Antrean:")
-        print(f"  Waktu Resolve (Prioritas Tinggi): {q_result['resolveDurationMs']:.1f} ms")
-        print(f"  Total Waktu 5 pencarian + resolve: {q_result['totalDurationMs']:.1f} ms")
+        print(f"  Waktu Resolve (Prioritas Tinggi): {q_result['resolveDurationMs']:.1f} ms (sebelumnya ~3879.7 ms)")
+        print(f"  Total Waktu 5 pencarian + resolve: {q_result['totalDurationMs']:.1f} ms (sebelumnya ~6387.5 ms)")
         print(f"  Status Permintaan Pencarian:")
         superseded_count = 0
         for out in q_result['searchOutcomes']:
             print(f"    - Query '{out['q']}': {out['status']} ({out.get('code') or out.get('count', 0)})")
-            if out.get('code') == 'SUPERSEDED':
+            msg_code = str(out.get('code', ''))
+            if 'SUPERSEDED' in msg_code or 'dibatalkan' in msg_code:
                 superseded_count += 1
         print(f"  Jumlah Pencarian Usang yang Berhasil Dibuang (SUPERSEDED): {superseded_count}/4")
         results['queue'] = q_result
 
         # -------------------------------------------------------------
-        # 2. PENGUKURAN COLD vs WARM vs CACHED vs PREFETCHED
+        # 2. PENGUKURAN COLD vs WARM vs CACHED
         # -------------------------------------------------------------
         print("\n--- 2. PENGUKURAN COLD vs WARM vs CACHED ---")
-        # Ambil 3 track valid
+        # Ambil trek segar yang belum di-cache
         req_id += 1
-        live_tracks = await cdp_eval(ws, """
+        fresh_tracks = await cdp_eval(ws, """
         (async () => {
-            const s = await window.musicApi.search("Sheila on 7");
-            return s.tracks.slice(0, 3).map(t => t.sourceId || t.id.replace('ytmusic:', ''));
+            const s = await window.musicApi.search("Padi");
+            return s.tracks.map(t => t.sourceId || t.id.replace('ytmusic:', ''));
         })()
         """, req_id)
-        id_a = live_tracks[0] if len(live_tracks) > 0 else "k1BfsO0mxWQ"
-        id_b = live_tracks[1] if len(live_tracks) > 1 else "LOzT38UYx3E"
-        id_c = live_tracks[2] if len(live_tracks) > 2 else "dQw4w9WgXcQ"
+        id_fresh_cold = fresh_tracks[0] if len(fresh_tracks) > 0 else "k1BfsO0mxWQ"
+        id_fresh_warm = fresh_tracks[1] if len(fresh_tracks) > 1 else "LOzT38UYx3E"
 
-        # Cold Resolve (matikan bridge)
+        # Cold Resolve (matikan bridge, ambil track segar)
         await kill_bridge_process()
         req_id += 1
         cold_resolve_ms = await cdp_eval(ws, f"""
         (async () => {{
             const t0 = performance.now();
-            await window.musicApi.resolveStream("{id_a}");
+            await window.musicApi.resolveStream("{id_fresh_cold}");
             return performance.now() - t0;
         }})()
         """, req_id)
-        print(f"  Cold Resolve: {cold_resolve_ms:.1f} ms")
+        print(f"  Cold Resolve (Bridge spawn + initial load + yt-dlp): {cold_resolve_ms:.1f} ms")
 
         # Warm Resolve (lagu baru tanpa cache)
         req_id += 1
         warm_resolve_ms = await cdp_eval(ws, f"""
         (async () => {{
             const t0 = performance.now();
-            await window.musicApi.resolveStream("{id_b}");
+            await window.musicApi.resolveStream("{id_fresh_warm}");
             return performance.now() - t0;
         }})()
         """, req_id)
@@ -231,7 +234,7 @@ async def main():
         cached_resolve_ms = await cdp_eval(ws, f"""
         (async () => {{
             const t0 = performance.now();
-            await window.musicApi.resolveStream("{id_b}");
+            await window.musicApi.resolveStream("{id_fresh_warm}");
             return performance.now() - t0;
         }})()
         """, req_id)
@@ -300,7 +303,7 @@ async def main():
                 for (let k = 0; k < 40; k++) {{
                     await new Promise(r => setTimeout(r, 50));
                     const el = document.querySelector('#search-results-container');
-                    const hasTracks = document.querySelectorAll('section div[style*="cursor: pointer"]').length > 0;
+                    const hasTracks = document.querySelectorAll('[data-track-row="true"]').length > 0;
                     if (el && hasTracks && el.getAttribute('data-query') === "{q}") {{
                         tResults = performance.now();
                         break;
@@ -322,7 +325,7 @@ async def main():
                 print(f"  [{i+1}/20] Ketik '{q}' -> Hasil Tampil: {sample['totalMs']:.1f} ms (Debounce: 400ms, IPC+Jaringan: {sample['ipcNetworkMs']:.1f}ms)")
             else:
                 print(f"  [{i+1}/20] Ketik '{q}' -> Timeout")
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(0.3)
 
         results['search_20'] = search_stage_metrics
 
@@ -333,7 +336,7 @@ async def main():
         req_id += 1
         vf_result = await cdp_eval(ws, """
         (async () => {
-            const rows = document.querySelectorAll('section div[style*="cursor: pointer"]');
+            const rows = document.querySelectorAll('[data-track-row="true"]');
             if (rows.length === 0) return null;
             
             const tClick = performance.now();
@@ -367,55 +370,76 @@ async def main():
             "total_all": []
         }
 
-        # Tunggu sampai audio selesai loading trek pertama
-        await asyncio.sleep(2)
-        req_id += 1
-        track_count = await cdp_eval(ws, "document.querySelectorAll('section div[style*=\"cursor: pointer\"]').length", req_id)
-        print(f"Tersedia {track_count} trek di layar untuk uji klik...")
+        # Lakukan klik trek dari kueri pertama (Chrisye - 10 trek), lalu kueri kedua (Dewa 19 - 10 trek)
+        queries_for_clicks = ["Chrisye", "Dewa 19"]
+        total_clicks_done = 0
 
-        for i in range(min(20, track_count)):
+        for q_click in queries_for_clicks:
+            if total_clicks_done >= 20:
+                break
+
+            # Pastikan kueri aktif
             req_id += 1
-            res_play = await cdp_eval(ws, f"""
+            await cdp_eval(ws, f"""
             (async () => {{
-                const rows = document.querySelectorAll('section div[style*=\"cursor: pointer\"]');
-                if (!rows[{i}]) return null;
-                
-                const audio = document.querySelector('audio');
-                const tClick = performance.now();
-                
-                // Klik baris trek
-                rows[{i}].click();
-                
-                // Tunggu sampai audio berbunyi (audio.currentTime > 0.05 dan !audio.paused)
-                let tAudioPlaying = 0;
-                for (let k = 0; k < 80; k++) {{
-                    await new Promise(r => setTimeout(r, 50));
-                    if (audio && !audio.paused && audio.currentTime > 0.05) {{
-                        tAudioPlaying = performance.now();
-                        break;
-                    }}
+                const input = document.querySelector('input[type="text"]');
+                const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+                setter.call(input, "{q_click}");
+                input.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                for (let k = 0; k < 30; k++) {{
+                    await new Promise(r => setTimeout(r, 100));
+                    const el = document.querySelector('#search-results-container');
+                    if (el && el.getAttribute('data-query') === "{q_click}") break;
                 }}
-                
-                return {{
-                    totalMs: tAudioPlaying > 0 ? (tAudioPlaying - tClick) : 0,
-                    currentTime: audio ? audio.currentTime : 0
-                }};
             }})()
             """, req_id)
+            await asyncio.sleep(1)
 
-            if res_play and res_play["totalMs"] > 0:
-                duration = res_play["totalMs"]
-                playback_stage_metrics["total_all"].append(duration)
-                if i == 0 or duration > 1000:
-                    playback_stage_metrics["first_resolve_uncached"].append(duration)
-                    kind = "Uncached First Resolve"
+            req_id += 1
+            cur_track_count = await cdp_eval(ws, "document.querySelectorAll('[data-track-row=\"true\"]').length", req_id)
+
+            for i in range(min(10, cur_track_count)):
+                total_clicks_done += 1
+                req_id += 1
+                res_play = await cdp_eval(ws, f"""
+                (async () => {{
+                    const rows = document.querySelectorAll('[data-track-row="true"]');
+                    if (!rows[{i}]) return null;
+                    
+                    const audio = document.querySelector('audio');
+                    const tClick = performance.now();
+                    
+                    rows[{i}].click();
+                    
+                    let tAudioPlaying = 0;
+                    for (let k = 0; k < 80; k++) {{
+                        await new Promise(r => setTimeout(r, 50));
+                        if (audio && !audio.paused && audio.currentTime > 0.05) {{
+                            tAudioPlaying = performance.now();
+                            break;
+                        }}
+                    }}
+                    
+                    return {{
+                        totalMs: tAudioPlaying > 0 ? (tAudioPlaying - tClick) : 0,
+                        currentTime: audio ? audio.currentTime : 0
+                    }};
+                }})()
+                """, req_id)
+
+                if res_play and res_play["totalMs"] > 0:
+                    duration = res_play["totalMs"]
+                    playback_stage_metrics["total_all"].append(duration)
+                    if total_clicks_done == 1 or duration > 1000:
+                        playback_stage_metrics["first_resolve_uncached"].append(duration)
+                        kind = "Uncached First Resolve"
+                    else:
+                        playback_stage_metrics["cached_or_prefetched"].append(duration)
+                        kind = "Prefetched / Cached"
+                    print(f"  [{total_clicks_done}/20] Klik trek {i+1} ('{q_click}') -> Audio Berbunyi ({kind}): {duration:.1f} ms")
                 else:
-                    playback_stage_metrics["cached_or_prefetched"].append(duration)
-                    kind = "Prefetched / Cached"
-                print(f"  [{i+1}/20] Klik baris {i+1} -> Audio Berbunyi ({kind}): {duration:.1f} ms")
-            else:
-                print(f"  [{i+1}/20] Klik baris {i+1} -> Timeout/Gagal")
-            await asyncio.sleep(1.5)
+                    print(f"  [{total_clicks_done}/20] Klik trek {i+1} ('{q_click}') -> Timeout/Gagal")
+                await asyncio.sleep(1.5)
 
         results['playback_20'] = playback_stage_metrics
 
@@ -426,7 +450,7 @@ async def main():
         req_id += 1
         long_tasks = await cdp_eval(ws, "window.__longTasks || []", req_id)
         tasks_over_100ms = [t for t in long_tasks if t.get('duration', 0) > 100]
-        print(f"  Total Long Tasks tercatat: {len(long_tasks)}")
+        print(f"  Total Long Tasks (>50 ms) tercatat: {len(long_tasks)}")
         print(f"  Long Tasks > 100 ms: {len(tasks_over_100ms)}")
         for lt in tasks_over_100ms[:5]:
             print(f"    - Task durasi: {lt.get('duration', 0):.1f} ms")
@@ -439,7 +463,6 @@ async def main():
         # 7. PEMAKAIAN RAM KONDISI B (BRIDGE HANGAT SAAT MEMUTAR)
         # -------------------------------------------------------------
         print("\n--- 7. PEMAKAIAN RAM KONDISI B (BRIDGE HANGAT) ---")
-        # Pastikan audio memutar
         await asyncio.sleep(2)
         mem = get_musick_memory()
         print(f"  Total RAM Working Set: {mem['TotalMB']} MB")

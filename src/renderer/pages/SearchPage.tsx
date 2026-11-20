@@ -21,6 +21,8 @@ interface TrackRowItemProps {
 const TrackRowItem = React.memo<TrackRowItemProps>(({ track, idx, isCurrent, isLoading, onPlay, onAddToPlaylist }) => {
   return (
     <div
+      className="track-row-item"
+      data-track-row="true"
       onClick={onPlay}
       style={{
         display: 'flex',
