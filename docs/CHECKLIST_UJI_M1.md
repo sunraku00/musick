@@ -106,3 +106,18 @@ Dokumen ini berisi panduan dan daftar periksa pengujian manual (*manual acceptan
 5. **Pencabutan Fisik Perangkat Audio (Headphone):** [ ] Belum diverifikasi di perangkat nyata (dilewati oleh pemilik produk).
 6. **Tombol Fisik Multimedia Keyboard Windows:** [ ] Belum diverifikasi di perangkat nyata.
 7. **Dialog Peringatan Windows SmartScreen:** [ ] Belum diverifikasi di perangkat nyata.
+
+---
+
+## 7. Lingkup Pengujian M2.1 (Skema Database v2, Lagu Disukai & Playlist Core)
+
+| # | Skenario Uji | Langkah Pengujian | Hasil yang Diharapkan | Status |
+|---|---|---|---|:---:|
+| 7.1 | **Migrasi Skema v2 & Pre-migration Backup** | Jalankan aplikasi dengan database v1 yang sudah berisi riwayat lagu. | File cadangan `.pre-v2.bak` dibuat otomatis sebelum migrasi. Tabel `tracks`, `liked_tracks`, `playlists`, `playlist_tracks` terbuat, riwayat lama diimpor ke `tracks`, dan versi skema menjadi 2. | [x] Lulus uji unit & diuji pada DB berisi data |
+| 7.2 | **Aturan F4: Batas Nama & Deskripsi Playlist** | Buat playlist dengan nama > 100 karakter dan deskripsi > 300 karakter. | Nama otomatis dipotong rapi menjadi maks 100 karakter, deskripsi maks 300 karakter. Nama kosong ditolak dengan validasi pesan error. | [x] Terverifikasi Otomatis & Lulus Uji Unit |
+| 7.3 | **Aturan F4: Duplikasi Trek dalam Playlist** | Tambahkan lagu yang sama sebanyak 2 kali ke dalam satu playlist. | Keduanya berhasil masuk dengan ID `playlistTrackId` unik dan urutan posisi terurut (posisi 1 dan 2). | [x] Terverifikasi Otomatis & Lulus Uji Unit |
+| 7.4 | **Aturan F4: Proteksi `ON DELETE RESTRICT`** | Coba hapus baris track langsung dari tabel `tracks` saat track tersebut masih ada di playlist. | Ditolak oleh SQLite dengan exception `FOREIGN KEY constraint failed`. Integritas referensi playlist tetap aman. | [x] Lulus Uji Unit |
+| 7.5 | **Aturan F4: Hapus Playlist (CASCADE Relasi)** | Hapus playlist yang memiliki trek via menu atau tombol hapus playlist. | Relasi pada `playlist_tracks` otomatis terhapus via CASCADE, namun trek di tabel `tracks` dan riwayat tetap utuh tidak ikut terhapus. | [x] Terverifikasi Otomatis & Lulus Uji Unit |
+| 7.6 | **Lagu yang Disukai (Liked Songs)** | Klik tombol hati (♡/❤️) di bar pemutar atau daftar lagu. | Lagu masuk ke tabel `liked_tracks` secara instan, ikon berubah menjadi merah (❤️). Tampil di halaman "Lagu Disukai" terurut waktu terbaru (`liked_at DESC`). | [x] Terverifikasi Otomatis & Lulus Uji Unit |
+| 7.7 | **Pengukuran Memori 3 Kondisi pada v0.2.0** | Jalankan `scripts/verify_m2_1_flow.py` pada build terpasang `Musick.exe` v0.2.0. | Kondisi A = 127.16 MB (Target $\le 150\text{ MB}$), Kondisi B = 190.83 MB (Target $\le 200\text{ MB}$), Kondisi C = 192.93 MB (Target $\le 250\text{ MB}$). Seluruhnya memenuhi batas PRD v1.2. | [x] Diukur pada build terpasang v0.2.0 |
+

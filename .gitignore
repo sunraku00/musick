@@ -12,6 +12,7 @@ node_modules
 dist
 dist-ssr
 release
+!release/SHA256.txt
 python-3.12.8-embed/
 python-embed.zip
 *.exe
