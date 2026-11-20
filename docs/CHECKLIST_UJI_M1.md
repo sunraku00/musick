@@ -121,3 +121,24 @@ Dokumen ini berisi panduan dan daftar periksa pengujian manual (*manual acceptan
 | 7.6 | **Lagu yang Disukai (Liked Songs)** | Klik tombol hati (♡/❤️) di bar pemutar atau daftar lagu. | Lagu masuk ke tabel `liked_tracks` secara instan, ikon berubah menjadi merah (❤️). Tampil di halaman "Lagu Disukai" terurut waktu terbaru (`liked_at DESC`). | [x] Terverifikasi Otomatis & Lulus Uji Unit |
 | 7.7 | **Pengukuran Memori 3 Kondisi pada v0.2.0** | Jalankan `scripts/verify_m2_1_flow.py` pada build terpasang `Musick.exe` v0.2.0. | Kondisi A = 127.16 MB (Target $\le 150\text{ MB}$), Kondisi B = 190.83 MB (Target $\le 200\text{ MB}$), Kondisi C = 192.93 MB (Target $\le 250\text{ MB}$). Seluruhnya memenuhi batas PRD v1.2. | [x] Diukur pada build terpasang v0.2.0 |
 
+---
+
+## 8. Lingkup Pengujian Reaktivitas Perpustakaan & Koreksi B3 (v0.2.2)
+
+Semua bukti pengukuran wajib menggunakan label standar: `[diukur]`, `[lulus uji unit]`, `[simulasi]`, `[belum diverifikasi]`.
+
+| # | Skenario Uji | Langkah Pengujian | Hasil yang Diharapkan | Status / Bukti |
+|---|---|---|---|:---:|
+| 8.1 | **Reaktivitas Halaman Lagu Disukai** | Buka halaman Lagu Disukai, sukai lagu dari PlayerBar. | Baris lagu muncul seketika di DOM tanpa reload (< 100 ms). Terukur: **8.96 ms**. | `[diukur]` LULUS |
+| 8.2 | **Reaktivitas Halaman Playlist** | Buka halaman Playlist, tambahkan trek ke playlist tersebut. | Baris lagu langsung muncul di DOM tanpa reload (< 100 ms). Terukur: **6.05 ms**. | `[diukur]` LULUS |
+| 8.3 | **Reaktivitas Hapus Trek Playlist** | Klik tombol hapus trek pada halaman Playlist. | Baris lagu langsung hilang dari DOM seketika (< 100 ms). Terukur: **2.96 ms**. | `[diukur]` LULUS |
+| 8.4 | **Reaktivitas Ganti Nama Playlist** | Ubah nama playlist lalu simpan via form UI. | Nama di header halaman dan sidebar berganti serentak (< 100 ms). Terukur: **47.39 ms**. | `[diukur]` LULUS |
+| 8.5 | **Reaktivitas Unlike ke PlayerBar** | Klik tombol unlike pada baris lagu di Lagu Disukai. | Ikon hati di PlayerBar langsung berubah putih (🤍) (< 100 ms). Terukur: **3.70 ms**. | `[diukur]` LULUS |
+| 8.6 | **Audit Property Test 50 Aksi Acak** | Eksekusi 50 aksi mutasi perpustakaan acak beruntun (like, unlike, create, rename, add, remove). | State DOM (sidebar count badge & playlist items) 100% cocok dengan baris tabel SQLite. | `[diukur]` LULUS |
+| 8.7 | **Pengukuran Private Working Set (PWS)** | Ukur memori fisik privat via `Win32_PerfFormattedData_PerfProc_Process.WorkingSetPrivate`. | Kondisi A: **129.75 MB** (Target $\le 150\text{ MB}$)<br>Kondisi B: **160.37 MB** (Target $\le 200\text{ MB}$)<br>Kondisi C: **185.10 MB** (Target $\le 250\text{ MB}$)<br>Kondisi D (500 trek): **203.40 MB** (Target $\le 250\text{ MB}$) | `[diukur]` LULUS |
+| 8.8 | **Audit Format Stream android_music** | Ekstraksi 3 trek nyata (Sheila on 7, Tulus, Dewa 19) dengan client `android_music`. | itag 251 (WebM Opus), 48 kHz, ~128–146 kbps, konsumsi 56.55–64.14 MB/jam. Sesuai spesifikasi C1.5. | `[diukur]` LULUS |
+| 8.9 | **Benchmark Kueri Pencarian Beragam** | Kueri judul lagu ("Hati-Hati di Jalan"), album ("Sheila on 7 07 Des"), non-Latin Jepang ("夜に駆ける"), non-Latin Arab ("حبيبي"), dan typo ("shela on 7"). | Debounce 400 ms + network ytmusic: latensi 451.46 ms s.d. 636.59 ms (Target warm p50 < 1000 ms). | `[diukur]` LULUS |
+| 8.10 | **Guardrails Prefetch Lagu Berikutnya** | Pemutaran jeda > 30 detik, antrean di lagu terakhir, atau terjadi pembatasan (RATE_LIMITED/BLOCKED). | Prefetch dinonaktifkan (0 network requests). | `[lulus uji unit]` LULUS |
+| 8.11 | **Kompatibilitas Migrasi DB v0.1.3 & v0.2.1** | Jalankan aplikasi pada database v1 (v0.1.3) dan v2 (v0.2.1) yang berisi data riwayat/antrean/playlist. | Backup otomatis `.pre-v2.bak` dibuat, migrasi mulus ke v2, data lama 100% utuh, fungsi baru v0.2.2 langsung aktif. | `[lulus uji unit]` LULUS |
+
+

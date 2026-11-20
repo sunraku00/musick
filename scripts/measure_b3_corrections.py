@@ -117,10 +117,11 @@ async def run_measurements():
         # -----------------------------------------------------------
         print("\n--- Memulai Kondisi B: Active Bridge ---")
         t_search_start = time.perf_counter()
-        search_res = await cdp_eval(ws, """
-            window.musicApi.searchTracks('Sheila on 7 Dan')
+        search_res_obj = await cdp_eval(ws, """
+            window.musicApi.search('Sheila on 7 Dan')
         """, req_id)
         req_id += 1
+        search_res = search_res_obj.get("tracks", []) if search_res_obj else []
         t_search_ms = (time.perf_counter() - t_search_start) * 1000
         print(f"Pencarian selesai dalam {t_search_ms:.2f} ms, ditemukan {len(search_res)} lagu.")
         await asyncio.sleep(1.0)
@@ -167,19 +168,15 @@ async def run_measurements():
         print("\n--- Memulai Kondisi D: 500 Trek di Playlist Virtualized ---")
         await cdp_eval(ws, """
             (async () => {
-                const pl = await window.__testLibrary.createPlaylist('Playlist Skala 500', 'Pengujian memori');
-                const tracks = [];
+                const pl = await window.musicApi.dbCreatePlaylist('Playlist Skala 500', 'Pengujian memori');
                 for (let i = 1; i <= 500; i++) {
-                    tracks.push({
+                    await window.musicApi.dbAddTrackToPlaylist(pl.id, {
                         id: 'scale_track_' + i,
                         title: 'Trek Skala ' + i,
                         artists: [{ id: 'art_' + i, name: 'Artis ' + i }],
                         album: { id: 'alb_' + i, title: 'Album Skala' },
                         durationSec: 180 + (i % 60)
                     });
-                }
-                for (const t of tracks) {
-                    await window.__testLibrary.addTrackToPlaylist(pl.id, t);
                 }
             })()
         """, req_id)
@@ -206,9 +203,10 @@ async def run_measurements():
         search_bench = []
         for q_type, q_val in queries:
             t0 = time.perf_counter()
-            tracks = await cdp_eval(ws, f"window.musicApi.searchTracks({json.dumps(q_val)})", req_id)
+            search_res_obj = await cdp_eval(ws, f"window.musicApi.search({json.dumps(q_val)})", req_id)
             req_id += 1
             lat = round((time.perf_counter() - t0) * 1000, 2)
+            tracks = search_res_obj.get("tracks", []) if search_res_obj else []
             first_title = tracks[0]["title"] if tracks else "Tidak ditemukan"
             search_bench.append({"type": q_type, "query": q_val, "latency_ms": lat, "count": len(tracks), "first": first_title})
             print(f"   [{q_type}] '{q_val}': {lat} ms, {len(tracks)} hasil. Pertama: {first_title}")

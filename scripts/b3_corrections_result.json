@@ -1,0 +1,43 @@
+{
+  "Kondisi_A_MB": 129.75,
+  "Kondisi_B_MB": 160.37,
+  "Kondisi_C_MB": 185.1,
+  "Kondisi_D_MB": 203.4,
+  "search_benchmark": [
+    {
+      "type": "Judul Lagu",
+      "query": "Hati-Hati di Jalan",
+      "latency_ms": 636.59,
+      "count": 12,
+      "first": "Hati‐Hati di Jalan"
+    },
+    {
+      "type": "Nama Album",
+      "query": "Sheila on 7 07 Des",
+      "latency_ms": 451.46,
+      "count": 8,
+      "first": "Sheila On 7 - 07 Des (Full Album Stream)"
+    },
+    {
+      "type": "Non-Latin (Jepang)",
+      "query": "夜に駆ける",
+      "latency_ms": 600.81,
+      "count": 12,
+      "first": "夜に駆ける"
+    },
+    {
+      "type": "Non-Latin (Arab)",
+      "query": "حبيبي",
+      "latency_ms": 579.86,
+      "count": 8,
+      "first": "Habibi"
+    },
+    {
+      "type": "Typo / Salah Ketik",
+      "query": "shela on 7",
+      "latency_ms": 550.73,
+      "count": 11,
+      "first": "Dan..."
+    }
+  ]
+}

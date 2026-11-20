@@ -304,7 +304,8 @@ async def run_e2e():
             (() => {
                 const input = document.getElementById('input-rename-playlist');
                 if (input) {
-                    input.value = 'Playlist Nama Baru Super Keren';
+                    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+                    setter.call(input, 'Playlist Nama Baru Super Keren');
                     input.dispatchEvent(new Event('input', { bubbles: true }));
                 }
                 const btnSave = document.getElementById('btn-save-rename');
@@ -409,9 +410,9 @@ async def run_e2e():
                 pid = random.choice(created_pl_ids)
                 await cdp_eval(ws, f"""
                     (async () => {{
-                        const tracks = await window.musicApi.dbGetPlaylistTracks({pid});
-                        if (tracks.length > 0) {{
-                            await window.musicApi.dbRemoveTrackFromPlaylist({pid}, tracks[0].playlistTrackId || tracks[0].id);
+                        const pl = await window.musicApi.dbGetPlaylist({pid});
+                        if (pl && pl.tracks && pl.tracks.length > 0) {{
+                            await window.musicApi.dbRemoveTrackFromPlaylist({pid}, pl.tracks[0].playlistTrackId || pl.tracks[0].id);
                         }}
                     }})()
                 """, req_id)
