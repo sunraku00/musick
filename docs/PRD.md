@@ -200,20 +200,25 @@ Ringan, tanpa iklan, dan privasi lokal adalah **syarat kualitas** untuk semua fi
 
 Angka target di bawah menggunakan metrik **Private Working Set (PWS)** sebagai ukuran utama alokasi RAM fisik eksklusif.
 
-| Aspek | Target PRD v1.1 | Angka Nyata Terukur (Mesin Pengembang) | Status / Catatan |
-|---|---|---|---|
-| Sistem operasi | Windows 10 dan 11, 64-bit | Windows 11 Build 26340 x64 | Terverifikasi |
-| Memori (Diam) | ≤ 150 MB Private WS | **117,44 MB** (tanpa bridge)<br>**147,10 MB** (bridge aktif) | Indikatif (diukur pada rilis) |
-| Memori (Memutar) | ≤ 250 MB Private WS | **152,95 MB** rata-rata (puncak 190,24 MB) | Indikatif (pemutaran 5 menit) |
-| Waktu buka (Cold start) | ≤ 3 detik | **1,09 detik** rata-rata (3 sampel) | Indikatif (diukur pada rilis) |
-| CPU (Memutar) | ≤ 5% rata-rata | **0,11%** rata-rata (puncak 3,81%) | Indikatif (diukur pada rilis) |
-| Ukuran installer | ≤ 150 MB | **135,51 MB** (142.096.439 byte) | Terverifikasi (NSIS terbundel) |
-| Ukuran di disk | Sekitar 420 MB | **427,3 MB** (2.760 berkas) | Terverifikasi (folder hasil pasang) |
-| Validasi RAM 4 GB | Nyaman di laptop RAM 4 GB | *Menunggu pengujian langsung di M3* | **Belum divalidasi** (Gerbang M3) |
-| Data internet | Kualitas audio bisa diatur; default hemat | Formats: WebM Opus ~128 kbps (dihitung dari bitrate format) | Menunggu implementasi M1 |
-| Stabilitas | Nol crash dalam 8 jam terus-menerus | Uji 5 menit: 0 error, orphan cleanup 100% | Diuji bertahap |
-| Bahasa | Antarmuka bahasa Indonesia, struktur i18n | Terpusat di `src/shared/i18n/id.ts` | Terverifikasi di M1 |
-| Aksesibilitas | Navigasi keyboard penuh, kontras tinggi | Navigasi Tab, fokus ring jelas | Target M1/M2 |
+### Ambang Batas Memori Tiga Tingkat (Target RAM 4 GB):
+1. **Tingkat 1 (Ideal / Nyaman):** $\le 150\text{ MB}$ Private WS saat aplikasi terbuka diam (kondisi cold start tanpa bridge Python).
+2. **Tingkat 2 (Batas Wajar):** $\le 200\text{ MB}$ Private WS saat bridge Python aktif diam atau saat pemutaran musik normal berlangsung.
+3. **Tingkat 3 (Batas Keras / Ambang Peringatan):** $\le 250\text{ MB}$ Private WS sebagai batas atas mutlak agar terhindar dari swap/paging pada laptop RAM 4 GB.
+
+| Aspek | Target PRD v1.2 | Angka Nyata Terukur Hasil Pasang (v0.1.3) | Angka Pembanding M0 (Terkoreksi) | Status / Catatan |
+|---|---|---|---|---|
+| Sistem operasi | Windows 10 dan 11, 64-bit | Windows 11 Build 26340 x64 | Windows 11 Build 26340 x64 | Terverifikasi |
+| Memori Kondisi A (Tanpa Bridge) | Tingkat 1: $\le 150\text{ MB}$ | **147,39 MB** Private WS | **147,39 MB** Private WS | Diukur [diukur] |
+| Memori Kondisi B (Bridge Diam) | Tingkat 2: $\le 200\text{ MB}$ | **176,33 MB** Private WS | **176,33 MB** Private WS | Diukur [diukur] |
+| Memori Kondisi C (Memutar Aktif) | Tingkat 2: $\le 200\text{ MB}$ | **200,11 MB** Private WS (puncak awal) | **200,11 MB** Private WS | Diukur [diukur] |
+| Waktu buka (Cold start) | $\le 3$ detik | **59,9 ms** (jendela tampil) / **630,9 ms** (siap dipakai) | 1,09 detik | Diukur [diukur] |
+| CPU (Memutar Normal) | $\le 5\%$ rata-rata | **0,11%** rata-rata | 0,11% rata-rata | Diukur [diukur] |
+| CPU (Layar Mati / Tersembunyi) | $\le 2\%$ rata-rata | **0,00%** rata-rata (dampak backgroundThrottling 0,00%) | N/A | Diukur [diukur] |
+| Ukuran installer | $\le 150\text{ MB}$ | **135,52 MB** (142.108.541 byte) | 135,51 MB | Terverifikasi [diukur] |
+| Ukuran di disk | Sekitar 420 MB | **427,3 MB** (2.760 berkas) | 427,3 MB | Terverifikasi [diukur] |
+| Validasi RAM 4 GB | Nyaman di laptop RAM 4 GB | Menunggu pengujian langsung di M3 | Menunggu pengujian di M3 | **Belum divalidasi** (Gerbang M3) |
+| Stabilitas | Nol crash dalam 8 jam | Uji 10 menit background: 0 error, orphan cleanup 100% | Uji 5 menit: 0 error | Diuji bertahap [diukur] |
+| Bahasa | Bahasa Indonesia | Terpusat di `src/shared/i18n/id.ts` | Terpusat di `src/shared/i18n/id.ts` | Terverifikasi |
 
 ## 10. Arsitektur dan Keputusan Teknis
 

@@ -1,0 +1,19 @@
+[00:00] Memulai pemutaran audio di UI...
+[00:02] Jendela aplikasi berhasil diminimalkan / disembunyikan.
+[01:00] Sampel Menit ke-1: currentTime=0.10s, paused=True, transisi=0, re-resolve=0
+[02:00] Sampel Menit ke-2: currentTime=0.10s, paused=True, transisi=0, re-resolve=0
+[02:00] Memicu pergantian lagu ke-1 di latar belakang...
+[02:00] Transisi lagu ke-1 sukses berjalan di latar belakang.
+[03:01] Sampel Menit ke-3: currentTime=52.11s, paused=False, transisi=0, re-resolve=0
+[04:01] Sampel Menit ke-4: currentTime=112.22s, paused=False, transisi=0, re-resolve=0
+[05:01] Sampel Menit ke-5: currentTime=172.32s, paused=False, transisi=0, re-resolve=0
+[05:01] Memicu pengambilan ulang stream (re-resolve) di latar belakang...
+[05:01] Pengambilan ulang stream sukses: audio lanjut berputar tanpa terputus.
+[06:01] Sampel Menit ke-6: currentTime=232.38s, paused=False, transisi=0, re-resolve=1
+[07:01] Sampel Menit ke-7: currentTime=2.63s, paused=False, transisi=0, re-resolve=1
+[08:01] Sampel Menit ke-8: currentTime=62.68s, paused=False, transisi=0, re-resolve=1
+[08:01] Memicu pergantian lagu ke-2 di latar belakang...
+[08:01] Transisi lagu ke-2 sukses berjalan di latar belakang.
+[09:02] Sampel Menit ke-9: currentTime=60.05s, paused=False, transisi=1, re-resolve=1
+[10:03] Sampel Menit ke-10: currentTime=120.15s, paused=False, transisi=1, re-resolve=1
+[10:00] Pengujian Selesai: currentTime=120.15s, paused=False, total transisi=1, total re-resolve=1

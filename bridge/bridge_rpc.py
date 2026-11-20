@@ -15,6 +15,17 @@ import yt_dlp
 
 yt = None
 ydl_resolver = None
+LAST_REQUEST_TIME = 0.0
+THROTTLE_INTERVAL_SEC = 0.250  # 250 ms throttle antarpermintaan ke Innertube API
+
+
+def throttle_request():
+    global LAST_REQUEST_TIME
+    now = time.time()
+    elapsed = now - LAST_REQUEST_TIME
+    if elapsed < THROTTLE_INTERVAL_SEC:
+        time.sleep(THROTTLE_INTERVAL_SEC - elapsed)
+    LAST_REQUEST_TIME = time.time()
 
 
 def get_yt():
@@ -22,6 +33,7 @@ def get_yt():
     if yt is None:
         # Menggunakan lokasi 'ID' untuk mengutamakan katalog dan relevansi Indonesia
         yt = YTMusic(location='ID')
+    throttle_request()
     return yt
 
 

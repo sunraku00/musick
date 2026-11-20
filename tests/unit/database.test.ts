@@ -131,4 +131,63 @@ describe('DatabaseService (node:sqlite) Hardening & Tests', () => {
     expect(dbService.getHistory(10)).toHaveLength(0);
     expect(dbService.getSearchHistory(10)).toHaveLength(0);
   });
+
+  it('mengamankan berkas korup ke .corrupt dan memulihkan dari cadangan .bak', () => {
+    // Siapkan db yang valid dengan cadangan
+    dbService.setSetting('test_key', 'safe_value');
+    dbService.close();
+
+    // Buka kembali agar cadangan otomatis .bak terbentuk
+    dbService = new DatabaseService(dbPath);
+    dbService.close();
+
+    // Pastikan berkas cadangan .bak ada
+    const backupPath = `${dbPath}.bak`;
+    expect(fs.existsSync(backupPath)).toBe(true);
+
+    // Rusak berkas dbPath secara sengaja dengan byte sampah
+    fs.writeFileSync(dbPath, 'BOGUS_GARBAGE_BYTES_CORRUPTED_SQLITE_HEADER');
+
+    // Buka kembali database service: harus mendeteksi korupsi, mengamankan ke .corrupt, dan pulih dari .bak
+    const recoveredDb = new DatabaseService(dbPath);
+    const corruptPath = `${dbPath}.corrupt`;
+    expect(fs.existsSync(corruptPath)).toBe(true);
+    expect(fs.readFileSync(corruptPath, 'utf-8')).toBe('BOGUS_GARBAGE_BYTES_CORRUPTED_SQLITE_HEADER');
+
+    // Nilai dari cadangan harus pulih
+    expect(recoveredDb.getSetting('test_key')).toBe('safe_value');
+    recoveredDb.close();
+  });
+
+  it('bukti fisik hapus riwayat: byte judul uji benar-benar hilang dari berkas .db dan .db-wal setelah VACUUM & checkpoint', () => {
+    const secretTitle = 'RAHASIA_JUDUL_FISIK_PURGED_XYZ_12345';
+    dbService.addHistory({
+      ...mockTrack,
+      id: 'ytmusic:purge-test-1',
+      title: secretTitle,
+    });
+    dbService.addSearchHistory(secretTitle);
+
+    // Tutup sejenak untuk memeriksa byte sebelum purge
+    dbService.close();
+    const readAllBytes = () => {
+      let b = fs.readFileSync(dbPath);
+      const walPath = `${dbPath}-wal`;
+      if (fs.existsSync(walPath)) {
+        b = Buffer.concat([b, fs.readFileSync(walPath)]);
+      }
+      return b.toString('binary');
+    };
+
+    expect(readAllBytes().includes(secretTitle)).toBe(true);
+
+    // Buka kembali dan hapus permanen
+    dbService = new DatabaseService(dbPath);
+    dbService.clearAllHistory();
+    dbService.close();
+
+    // Verifikasi fisik: byte judul uji wajib 0 di .db maupun .db-wal
+    const afterBytes = readAllBytes();
+    expect(afterBytes.includes(secretTitle)).toBe(false);
+  });
 });

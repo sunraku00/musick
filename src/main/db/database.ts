@@ -22,17 +22,18 @@ export class DatabaseService {
       fs.mkdirSync(dir, { recursive: true });
     }
 
-    // Buat cadangan otomatis (.bak) sebelum migrasi / inisialisasi jika berkas sudah ada
-    if (fs.existsSync(dbPath)) {
-      try {
-        fs.copyFileSync(dbPath, `${dbPath}.bak`);
-      } catch {
-        // Abaikan jika tidak dapat menyalin cadangan
+    try {
+      this.db = new DatabaseSync(dbPath);
+      this.configurePragmasAndIntegrity();
+      // Buat cadangan otomatis (.bak) hanya jika database terbukti sehat
+      if (fs.existsSync(dbPath)) {
+        try {
+          fs.copyFileSync(dbPath, `${dbPath}.bak`);
+        } catch {}
       }
+    } catch {
+      this.recoverFromBackup();
     }
-
-    this.db = new DatabaseSync(dbPath);
-    this.configurePragmasAndIntegrity();
     this.runMigrations();
   }
 
@@ -42,27 +43,34 @@ export class DatabaseService {
     this.db.exec('PRAGMA journal_mode = WAL;');
 
     // Jalankan pemeriksaan integritas (PRAGMA integrity_check)
-    try {
-      const stmt = this.db.prepare('PRAGMA integrity_check');
-      const checkRow = stmt.get() as Record<string, unknown> | undefined;
-      const status = checkRow ? Object.values(checkRow)[0] : 'ok';
-      if (status !== 'ok') {
-        console.warn('[Database] Integritas database rusak, memulihkan dari cadangan terakhir...');
-        this.recoverFromBackup();
-      }
-    } catch {
+    const stmt = this.db.prepare('PRAGMA integrity_check');
+    const checkRow = stmt.get() as Record<string, unknown> | undefined;
+    const status = checkRow ? Object.values(checkRow)[0] : 'ok';
+    if (status !== 'ok') {
+      console.warn('[Database] Integritas database rusak, memulihkan dari cadangan terakhir...');
       this.recoverFromBackup();
     }
   }
 
   private recoverFromBackup(): void {
     try {
-      this.db.close();
+      if (this.db) {
+        try { this.db.close(); } catch {}
+      }
+      const corruptPath = `${this.dbPath}.corrupt`;
+      // Simpan berkas rusak sebagai .corrupt agar tidak hilang
+      if (fs.existsSync(this.dbPath)) {
+        try {
+          fs.copyFileSync(this.dbPath, corruptPath);
+          console.warn(`[Database] Berkas database rusak disimpan ke ${corruptPath}`);
+        } catch {}
+      }
       const backupPath = `${this.dbPath}.bak`;
       if (fs.existsSync(backupPath)) {
         fs.copyFileSync(backupPath, this.dbPath);
+        console.log(`[Database] Database dipulihkan dari cadangan ${backupPath}`);
       } else {
-        fs.unlinkSync(this.dbPath);
+        if (fs.existsSync(this.dbPath)) fs.unlinkSync(this.dbPath);
       }
       this.db = new DatabaseSync(this.dbPath);
       this.db.exec('PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL;');
@@ -263,6 +271,15 @@ export class DatabaseService {
     const searchCleared = sRow?.c || 0;
 
     this.db.exec('DELETE FROM history; DELETE FROM search_history;');
+
+    // Checkpoint WAL dan VACUUM fisik untuk menghapus residu byte dari berkas .db dan .db-wal
+    try {
+      this.db.exec('PRAGMA wal_checkpoint(TRUNCATE);');
+      this.db.exec('VACUUM;');
+    } catch (err) {
+      console.warn('[Database] Peringatan saat wal_checkpoint / vacuum:', err);
+    }
+
     return { playbackCleared, searchCleared };
   }
 

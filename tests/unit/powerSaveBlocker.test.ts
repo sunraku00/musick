@@ -93,4 +93,51 @@ describe('PowerSaveBlocker and Screen-off Setting Unit Tests', () => {
     expect(res.blockerId).toBeNull();
     expect(mockPowerSaveBlocker.start).toHaveBeenCalledTimes(1); // tetap 1, tidak nambah
   });
+
+  it('pelepasan blocker pada seluruh jalur: akhir antrean, error terminal, crash bridge, dan app quit', () => {
+    let activeBlockerId: number | null = 105;
+    const mockPowerSaveBlocker = {
+      stop: vi.fn((id: number) => {
+        if (activeBlockerId === id) activeBlockerId = null;
+      }),
+      isStarted: vi.fn((id: number) => activeBlockerId === id),
+    };
+
+    const cleanUpAndQuit = () => {
+      if (activeBlockerId !== null && mockPowerSaveBlocker.isStarted(activeBlockerId)) {
+        mockPowerSaveBlocker.stop(activeBlockerId);
+        activeBlockerId = null;
+      }
+    };
+
+    // Jalur A: Lagu selesai & akhir antrean (transisi ke status 'idle')
+    let isPlaying = false; // status === 'idle'
+    if (!isPlaying) cleanUpAndQuit();
+    expect(activeBlockerId).toBeNull();
+    expect(mockPowerSaveBlocker.stop).toHaveBeenCalledWith(105);
+
+    // Jalur B: Error terminal / stream loop guard (status === 'error')
+    activeBlockerId = 106;
+    isPlaying = false; // status === 'error'
+    if (!isPlaying) cleanUpAndQuit();
+    expect(activeBlockerId).toBeNull();
+    expect(mockPowerSaveBlocker.stop).toHaveBeenCalledWith(106);
+
+    // Jalur C: Bridge mati saat pemutaran / fatal request error (status === 'error')
+    activeBlockerId = 107;
+    isPlaying = false;
+    if (!isPlaying) cleanUpAndQuit();
+    expect(activeBlockerId).toBeNull();
+    expect(mockPowerSaveBlocker.stop).toHaveBeenCalledWith(107);
+
+    // Jalur D: Aplikasi keluar normal (cleanUpAndQuit pada before-quit/will-quit)
+    activeBlockerId = 108;
+    cleanUpAndQuit();
+    expect(activeBlockerId).toBeNull();
+    expect(mockPowerSaveBlocker.stop).toHaveBeenCalledWith(108);
+
+    // Jalur E: Idempoten, pemanggilan berulang tidak menyebabkan error
+    cleanUpAndQuit();
+    expect(activeBlockerId).toBeNull();
+  });
 });

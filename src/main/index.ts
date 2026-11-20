@@ -86,7 +86,7 @@ function createWindow(): void {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
-      backgroundThrottling: false, // Mencegah Chromium membatasi timer saat layar mati / jendela tertutup
+      backgroundThrottling: process.env.MUSICK_ENABLE_BACKGROUND_THROTTLING === '1' ? true : false, // Bawaan false: Mencegah Chromium membatasi timer saat layar mati
       preload: path.join(__dirname, '../preload/index.cjs'),
     },
   });
@@ -148,6 +148,7 @@ if (!gotTheLock) {
         activeSourceId: active.id,
         activeSourceName: active.name,
         sources: sourceManager.listSources().map((s) => s.id),
+        versions: process.versions,
         startedAt: new Date().toISOString(),
       };
       fs.writeFileSync(
