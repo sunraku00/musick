@@ -35,14 +35,14 @@ export class YtMusicSource implements MusicSource {
     this.lastRequestTime = Date.now();
   }
 
-  async search(query: string): Promise<SearchResult> {
+  async search(query: string, filter?: string): Promise<SearchResult> {
     const trimmed = query.trim();
     if (!trimmed) {
       return { query, tracks: [], artists: [], albums: [] };
     }
 
     await this.throttle();
-    const result = await this.bridge.search(trimmed);
+    const result = await this.bridge.search(trimmed, filter);
     if (!result || !Array.isArray(result.tracks)) {
       throw new MusicSourceError('SOURCE_CHANGED', 'Format hasil pencarian sumber tidak valid');
     }

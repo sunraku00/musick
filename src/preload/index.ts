@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { MusicSourceError, type MusicSourceErrorPayload } from '../shared/errors';
-import { IPC_CHANNELS, type AppInfo, type MusicApi, type SavedPlayback } from '../shared/ipc';
+import { IPC_CHANNELS, type AppInfo, type ClearHistoryResult, type MusicApi, type SavedPlayback } from '../shared/ipc';
 import type { Album, Artist, SearchResult, SourceMeta, StreamInfo, Track } from '../shared/types';
 
 interface IpcResult<T> {
@@ -21,8 +21,8 @@ async function invokeIpc<T>(channel: string, ...args: unknown[]): Promise<T> {
 }
 
 const api: MusicApi = {
-  search: (query: string): Promise<SearchResult> => {
-    return invokeIpc<SearchResult>(IPC_CHANNELS.SEARCH, query);
+  search: (query: string, filter?: string): Promise<SearchResult> => {
+    return invokeIpc<SearchResult>(IPC_CHANNELS.SEARCH, query, filter);
   },
   getTrack: (sourceId: string): Promise<Track> => {
     return invokeIpc<Track>(IPC_CHANNELS.GET_TRACK, sourceId);
@@ -71,6 +71,9 @@ const api: MusicApi = {
   },
   dbGetHistory: (limit?: number): Promise<Track[]> => {
     return invokeIpc<Track[]>(IPC_CHANNELS.DB_GET_HISTORY, limit);
+  },
+  dbClearAllHistory: (): Promise<ClearHistoryResult> => {
+    return invokeIpc<ClearHistoryResult>(IPC_CHANNELS.DB_CLEAR_ALL_HISTORY);
   },
   onSuspend: (callback: () => void): (() => void) => {
     const handler = () => callback();

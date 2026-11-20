@@ -18,7 +18,13 @@ export const IPC_CHANNELS = {
   DB_GET_QUEUE: 'db:get-queue',
   DB_ADD_HISTORY: 'db:add-history',
   DB_GET_HISTORY: 'db:get-history',
+  DB_CLEAR_ALL_HISTORY: 'db:clear-all-history',
 } as const;
+
+export interface ClearHistoryResult {
+  readonly playbackCleared: number;
+  readonly searchCleared: number;
+}
 
 export interface AppInfo {
   readonly version: string;
@@ -34,7 +40,7 @@ export interface SavedPlayback {
 }
 
 export interface MusicApi {
-  search(query: string): Promise<SearchResult>;
+  search(query: string, filter?: string): Promise<SearchResult>;
   getTrack(sourceId: string): Promise<Track>;
   getArtist(sourceId: string): Promise<Artist>;
   getAlbum(sourceId: string): Promise<Album>;
@@ -51,6 +57,7 @@ export interface MusicApi {
   dbGetQueue(): Promise<Track[]>;
   dbAddHistory(track: Track): Promise<void>;
   dbGetHistory(limit?: number): Promise<Track[]>;
+  dbClearAllHistory(): Promise<ClearHistoryResult>;
   onSuspend(callback: () => void): () => void;
   onResume(callback: () => void): () => void;
 }

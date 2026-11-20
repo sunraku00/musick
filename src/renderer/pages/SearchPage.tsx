@@ -92,6 +92,35 @@ export const SearchPage: React.FC = () => {
     }
   };
 
+  const handleTabChange = async (tab: TabType) => {
+    setActiveTab(tab);
+    if (tab === 'all' || !results || !inputVal.trim()) return;
+
+    // Jika tab kategori dibuka dan butuh hasil lebih banyak (lazy load filtered)
+    const filterMap: Record<string, string> = {
+      tracks: 'songs',
+      artists: 'artists',
+      albums: 'albums',
+    };
+    const targetFilter = filterMap[tab];
+    if (targetFilter && window.musicApi) {
+      try {
+        const fullResults = await window.musicApi.search(inputVal.trim(), targetFilter);
+        setResults((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            tracks: tab === 'tracks' ? fullResults.tracks : prev.tracks,
+            artists: tab === 'artists' ? fullResults.artists : prev.artists,
+            albums: tab === 'albums' ? fullResults.albums : prev.albums,
+          };
+        });
+      } catch {
+        // Biarkan hasil campuran sebelumnya jika filter tambahan gagal
+      }
+    }
+  };
+
   const handleTrackClick = (track: Track, index: number) => {
     if (results && results.tracks.length > 0) {
       setQueue(results.tracks, index);
@@ -226,7 +255,7 @@ export const SearchPage: React.FC = () => {
         <div style={{ display: 'flex', gap: '8px', marginBottom: '24px' }}>
           <button
             id="tab-all"
-            onClick={() => setActiveTab('all')}
+            onClick={() => handleTabChange('all')}
             style={{
               padding: '6px 14px',
               borderRadius: '500px',
@@ -243,7 +272,7 @@ export const SearchPage: React.FC = () => {
           </button>
           <button
             id="tab-tracks"
-            onClick={() => setActiveTab('tracks')}
+            onClick={() => handleTabChange('tracks')}
             style={{
               padding: '6px 14px',
               borderRadius: '500px',
@@ -260,7 +289,7 @@ export const SearchPage: React.FC = () => {
           </button>
           <button
             id="tab-artists"
-            onClick={() => setActiveTab('artists')}
+            onClick={() => handleTabChange('artists')}
             style={{
               padding: '6px 14px',
               borderRadius: '500px',
@@ -277,7 +306,7 @@ export const SearchPage: React.FC = () => {
           </button>
           <button
             id="tab-albums"
-            onClick={() => setActiveTab('albums')}
+            onClick={() => handleTabChange('albums')}
             style={{
               padding: '6px 14px',
               borderRadius: '500px',

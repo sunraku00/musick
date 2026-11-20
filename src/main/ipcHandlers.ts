@@ -105,8 +105,8 @@ export function registerIpcHandlers(
     });
   };
 
-  handleIpc(IPC_CHANNELS.SEARCH, async (query: string) => {
-    return sourceManager.getActiveSource().search(query);
+  handleIpc(IPC_CHANNELS.SEARCH, async (query: string, filter?: string) => {
+    return sourceManager.getActiveSource().search(query, filter);
   });
 
   handleIpc(IPC_CHANNELS.GET_TRACK, async (sourceId: string) => {
@@ -138,15 +138,15 @@ export function registerIpcHandlers(
   });
 
   handleIpc(IPC_CHANNELS.GET_APP_INFO, async (): Promise<AppInfo> => {
-    let ver = '0.1.1';
+    let ver = '0.1.2';
     try {
       ver = app.getVersion();
     } catch {
-      ver = '0.1.1';
+      ver = '0.1.2';
     }
     return {
       version: ver,
-      commitHash: (typeof __COMMIT_HASH__ !== 'undefined' ? __COMMIT_HASH__ : process.env.COMMIT_HASH) || 'd3e530d',
+      commitHash: (typeof __COMMIT_HASH__ !== 'undefined' ? __COMMIT_HASH__ : process.env.COMMIT_HASH) || 'unknown',
     };
   });
 
@@ -181,5 +181,9 @@ export function registerIpcHandlers(
 
   handleIpc(IPC_CHANNELS.DB_GET_HISTORY, async (limit?: number) => {
     return dbService ? dbService.getHistory(limit) : [];
+  });
+
+  handleIpc(IPC_CHANNELS.DB_CLEAR_ALL_HISTORY, async () => {
+    return dbService ? dbService.clearAllHistory() : { playbackCleared: 0, searchCleared: 0 };
   });
 }

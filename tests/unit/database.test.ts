@@ -5,7 +5,7 @@ import * as os from 'os';
 import { DatabaseService } from '../../src/main/db/database';
 import type { Track } from '../../src/shared/types';
 
-describe('DatabaseService (node:sqlite) Unit Tests', () => {
+describe('DatabaseService (node:sqlite) Hardening & Tests', () => {
   let tempDir: string;
   let dbPath: string;
   let dbService: DatabaseService;
@@ -27,8 +27,24 @@ describe('DatabaseService (node:sqlite) Unit Tests', () => {
   });
 
   afterEach(() => {
-    dbService.close();
+    try {
+      dbService.close();
+    } catch {}
     fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  it('menginisialisasi schema_meta dengan versi 1 dan mengaktifkan WAL/FK', () => {
+    expect(dbService.getSchemaVersion()).toBe(1);
+  });
+
+  it('membuat cadangan otomatis .bak saat database yang ada dibuka kembali', () => {
+    dbService.setSetting('testKey', 'testVal');
+    dbService.close();
+
+    // Buka ulang database
+    dbService = new DatabaseService(dbPath);
+    expect(fs.existsSync(`${dbPath}.bak`)).toBe(true);
+    expect(dbService.getSetting('testKey')).toBe('testVal');
   });
 
   it('dapat menyimpan dan membaca setting key-value', () => {
@@ -79,17 +95,40 @@ describe('DatabaseService (node:sqlite) Unit Tests', () => {
     expect(loaded[1].title).toBe('Lagu Antrean 2');
   });
 
-  it('dapat mencatat dan mengambil riwayat pemutaran (history)', () => {
-    dbService.addHistory(mockTrack);
-    dbService.addHistory({
-      ...mockTrack,
-      id: 'ytmusic:test-456',
-      title: 'Lagu Terbaru',
-    });
+  it('menerapkan batas otomatis riwayat putar (maksimal 500) dan riwayat cari (maksimal 50)', () => {
+    // Uji batas pencarian: masukkan 60 kueri
+    for (let i = 1; i <= 60; i++) {
+      dbService.addSearchHistory(`Kueri Lagu ${i}`);
+    }
+    const searchHistory = dbService.getSearchHistory(100);
+    expect(searchHistory.length).toBeLessThanOrEqual(50);
+    expect(searchHistory[0]).toBe('Kueri Lagu 60');
 
-    const history = dbService.getHistory(10);
-    expect(history).toHaveLength(2);
-    expect(history[0].title).toBe('Lagu Terbaru');
-    expect(history[1].title).toBe('Lagu Uji Persistensi');
+    // Uji riwayat putar: masukkan 10 riwayat
+    for (let i = 1; i <= 10; i++) {
+      dbService.addHistory({
+        ...mockTrack,
+        id: `ytmusic:track-${i}`,
+        title: `Lagu ${i}`,
+      });
+    }
+    const playHistory = dbService.getHistory(20);
+    expect(playHistory.length).toBe(10);
+    expect(playHistory[0].title).toBe('Lagu 10');
+  });
+
+  it('menghapus seluruh riwayat putar dan riwayat cari secara permanen via clearAllHistory', () => {
+    dbService.addHistory(mockTrack);
+    dbService.addSearchHistory('Sheila on 7');
+
+    expect(dbService.getHistory(10).length).toBe(1);
+    expect(dbService.getSearchHistory(10).length).toBe(1);
+
+    const cleared = dbService.clearAllHistory();
+    expect(cleared.playbackCleared).toBe(1);
+    expect(cleared.searchCleared).toBe(1);
+
+    expect(dbService.getHistory(10)).toHaveLength(0);
+    expect(dbService.getSearchHistory(10)).toHaveLength(0);
   });
 });

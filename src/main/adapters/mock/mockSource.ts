@@ -144,7 +144,7 @@ export class MockSource implements MusicSource {
   readonly id = 'mock';
   readonly name = 'Sumber Mock (Offline)';
 
-  async search(query: string): Promise<SearchResult> {
+  async search(query: string, filter?: string): Promise<SearchResult> {
     const trimmed = query.trim().toLowerCase();
 
     if (trimmed === 'trigger:network_error') {

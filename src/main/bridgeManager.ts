@@ -283,8 +283,8 @@ export class BridgeManager {
     }
   }
 
-  async search(query: string): Promise<SearchResult> {
-    return this.call<SearchResult>('search', { query });
+  async search(query: string, filter?: string): Promise<SearchResult> {
+    return this.call<SearchResult>('search', { query, filter });
   }
 
   async getTrack(sourceId: string): Promise<Track> {

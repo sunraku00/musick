@@ -63,47 +63,45 @@ def handle_search(params):
     if not query:
         return {'query': '', 'tracks': [], 'artists': [], 'albums': []}
 
+    search_filter = params.get('filter')
     client = get_yt()
 
-    # Eksekusi pencarian terkelompok (Lagu, Artis, Album) secara paralel
     raw_songs = []
     raw_artists = []
     raw_albums = []
 
-    with ThreadPoolExecutor(max_workers=3) as executor:
-        f_songs = executor.submit(client.search, query, filter='songs')
-        f_artists = executor.submit(client.search, query, filter='artists')
-        f_albums = executor.submit(client.search, query, filter='albums')
-
+    # Permintaan tunggal tanpa filter untuk tab "Semua", atau permintaan spesifik untuk tab tertentu
+    if search_filter == 'songs':
         try:
-            raw_songs = f_songs.result(timeout=6.0) or []
+            raw_songs = client.search(query, filter='songs') or []
         except Exception:
             raw_songs = []
-
+    elif search_filter == 'artists':
         try:
-            raw_artists = f_artists.result(timeout=6.0) or []
+            raw_artists = client.search(query, filter='artists') or []
         except Exception:
             raw_artists = []
-
+    elif search_filter == 'albums':
         try:
-            raw_albums = f_albums.result(timeout=6.0) or []
+            raw_albums = client.search(query, filter='albums') or []
         except Exception:
             raw_albums = []
-
-    # Fallback ke pencarian umum jika ketiga filter kosong
-    if not raw_songs and not raw_artists and not raw_albums:
+    else:
+        # Tab "Semua": Tembakkan TEPAT SATU permintaan tanpa filter (hasil campuran)
         try:
-            raw_general = client.search(query)
-            for item in raw_general:
-                t = item.get('resultType')
-                if t in ('song', 'video') and item.get('videoId'):
+            raw_mixed = client.search(query, filter=None) or []
+            for item in raw_mixed:
+                rtype = item.get('resultType')
+                if rtype in ('song', 'video') and item.get('videoId'):
                     raw_songs.append(item)
-                elif t == 'artist':
+                elif rtype == 'artist':
                     raw_artists.append(item)
-                elif t == 'album':
+                elif rtype == 'album':
                     raw_albums.append(item)
         except Exception:
-            pass
+            raw_songs = []
+            raw_artists = []
+            raw_albums = []
 
     tracks = []
     for s in raw_songs:

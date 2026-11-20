@@ -93,8 +93,8 @@ def main():
     if "mock" in sources:
         errors.append(f"'mock' terdaftar dalam sources rilis: {sources}")
 
-    if status_data.get("version") != "0.1.1":
-        errors.append(f"version bukan '0.1.1' (didapat: {status_data.get('version')})")
+    if status_data.get("version") != "0.1.2":
+        errors.append(f"version bukan '0.1.2' (didapat: {status_data.get('version')})")
 
     if errors:
         print("[FAIL] Verifikasi Smoke Test Gagal:")

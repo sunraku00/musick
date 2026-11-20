@@ -17,16 +17,38 @@ const AppContent: React.FC = () => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
-      // Jangan cegah spasi / panah saat pengguna sedang mengetik di input pencarian
+
+      // 1. Abaikan pintasan jika pengguna sedang mengetik di input teks/textarea
       if (
         target &&
-        (target.tagName === 'INPUT' ||
-          target.tagName === 'TEXTAREA' ||
-          target.isContentEditable)
+        (target.tagName === 'TEXTAREA' ||
+          target.isContentEditable ||
+          (target.tagName === 'INPUT' && (target as HTMLInputElement).type !== 'range'))
       ) {
         return;
       }
 
+      // 2. Tombol (BUTTON): biarkan Space memicu klik native tombol tanpa aksi ganda
+      if (target && target.tagName === 'BUTTON' && e.code === 'Space') {
+        return;
+      }
+
+      // 3. Slider Volume/Posisi (INPUT type="range"): biarkan panah mengatur slider native
+      if (target && target.tagName === 'INPUT' && (target as HTMLInputElement).type === 'range') {
+        if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.code)) {
+          return;
+        }
+      }
+
+      // 4. Kontainer Daftar Bergulir (Scrollable list): biarkan panah atas/bawah menggulir daftar
+      if (target && target.scrollHeight > target.clientHeight && ['ArrowUp', 'ArrowDown'].includes(e.code)) {
+        const overflowY = window.getComputedStyle(target).overflowY;
+        if (overflowY === 'auto' || overflowY === 'scroll') {
+          return;
+        }
+      }
+
+      // 5. Eksekusi pintasan pemutar global
       if (e.code === 'Space') {
         e.preventDefault();
         togglePlay();

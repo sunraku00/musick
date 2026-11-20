@@ -5,9 +5,26 @@ export const SettingsPage: React.FC = () => {
   const [audioQuality, setAudioQuality] = useState<'economy' | 'high'>('economy');
   const [activeSourceName, setActiveSourceName] = useState<string>('Memuat...');
   const [appInfo, setAppInfo] = useState<{ version: string; commitHash: string }>({
-    version: '0.1.1',
-    commitHash: 'd3e530d',
+    version: '0.1.2',
+    commitHash: '492a4c7',
   });
+
+  const [clearStatus, setClearStatus] = useState<string | null>(null);
+
+  const handleClearHistory = async () => {
+    if (!window.confirm('Apakah Anda yakin ingin menghapus seluruh riwayat putar dan riwayat cari secara permanen?')) {
+      return;
+    }
+    if (window.musicApi) {
+      try {
+        const res = await window.musicApi.dbClearAllHistory();
+        setClearStatus(`Berhasil menghapus ${res.playbackCleared} riwayat putar dan ${res.searchCleared} riwayat cari.`);
+        setTimeout(() => setClearStatus(null), 5000);
+      } catch (err: any) {
+        setClearStatus(`Gagal menghapus riwayat: ${err?.message || err}`);
+      }
+    }
+  };
 
   useEffect(() => {
     const fetchInfo = async () => {
@@ -92,6 +109,34 @@ export const SettingsPage: React.FC = () => {
         <p style={{ margin: 0, fontSize: '13px', color: '#b3b3b3', lineHeight: '1.6' }}>
           {ID_STRINGS.settings.privacyText}
         </p>
+
+        {/* Tombol Hapus Riwayat Permanen */}
+        <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #282828' }}>
+          <button
+            id="btn-clear-history"
+            onClick={handleClearHistory}
+            style={{
+              padding: '8px 16px',
+              backgroundColor: '#3d1d1d',
+              color: '#ff8a8a',
+              border: '1px solid #5c2222',
+              borderRadius: '6px',
+              fontSize: '13px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              transition: 'background-color 0.15s',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#5c2222')}
+            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#3d1d1d')}
+          >
+            🗑 Hapus Riwayat Putar & Cari
+          </button>
+          {clearStatus && (
+            <span id="clear-status-msg" style={{ marginLeft: '12px', fontSize: '12px', color: '#1db954' }}>
+              ✓ {clearStatus}
+            </span>
+          )}
+        </div>
 
         <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid #282828', fontSize: '12px', color: '#777777', display: 'flex', flexDirection: 'column', gap: '6px' }}>
           <div id="app-version-info">Musick v{appInfo.version} ({appInfo.commitHash}) • Desktop Windows 64-bit • Dibangun dengan Electron + React</div>

@@ -151,12 +151,35 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     // Penanganan perangkat audio berganti / headphone dicabut (PRD F2)
     let handleDeviceChange: (() => void) | undefined;
+    let knownAudioOutputs: string[] = [];
     if (typeof navigator !== 'undefined' && navigator.mediaDevices) {
-      handleDeviceChange = () => {
-        if (machine.getState().status === 'playing') {
-          machine.pause();
-          setToastMessage(ID_STRINGS.player.audioDeviceDisconnected);
-          setTimeout(() => setToastMessage(null), 4000);
+      navigator.mediaDevices
+        .enumerateDevices()
+        .then((devices) => {
+          knownAudioOutputs = devices
+            .filter((d) => d.kind === 'audiooutput')
+            .map((d) => d.deviceId);
+        })
+        .catch(() => {});
+
+      handleDeviceChange = async () => {
+        try {
+          const currentDevices = await navigator.mediaDevices.enumerateDevices();
+          const currentOutputs = currentDevices
+            .filter((d) => d.kind === 'audiooutput')
+            .map((d) => d.deviceId);
+
+          // Cek apakah ada output yang hilang (misal headphone/headset Bluetooth dicabut)
+          const lostOutput = knownAudioOutputs.find((id) => id && !currentOutputs.includes(id));
+          knownAudioOutputs = currentOutputs;
+
+          if (lostOutput && machine.getState().status === 'playing') {
+            machine.pause();
+            setToastMessage(ID_STRINGS.player.audioDeviceDisconnected);
+            setTimeout(() => setToastMessage(null), 4000);
+          }
+        } catch {
+          // Abaikan bila akses mediaDevices gagal
         }
       };
       navigator.mediaDevices.addEventListener('devicechange', handleDeviceChange);

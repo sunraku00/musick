@@ -4,9 +4,13 @@ import path from 'path';
 import { build } from 'vite';
 
 const pkg = JSON.parse(fs.readFileSync('package.json', 'utf-8'));
-let commitHash = 'd3e530d';
+let commitHash = 'unknown';
 try {
   commitHash = execSync('git rev-parse --short HEAD').toString().trim();
+  const status = execSync('git status --porcelain').toString().trim();
+  if (status.length > 0) {
+    commitHash += '-dirty';
+  }
 } catch {}
 process.env.COMMIT_HASH = commitHash;
 

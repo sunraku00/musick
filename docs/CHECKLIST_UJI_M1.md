@@ -53,7 +53,7 @@ Dokumen ini berisi panduan dan daftar periksa pengujian manual (*manual acceptan
 | # | Skenario Uji | Langkah Pengujian | Hasil yang Diharapkan | Status |
 |---|---|---|---|:---:|
 | 4.1 | **Navigasi Sidebar** | Klik menu "Beranda", "Cari", dan "Pengaturan" di sidebar kiri. | Halaman berganti seketika dengan transisi mulus; status pemutaran audio di bar bawah TIDAK terputus. | [x] Terverifikasi Otomatis |
-| 4.2 | **Halaman Pengaturan** | Buka menu Pengaturan. | Tampil info versi aplikasi (v0.1.1), commit hash pendek, sumber musik aktif (YouTube Music), opsi kualitas audio, dan info privasi. | [x] Terverifikasi Otomatis |
+| 4.2 | **Halaman Pengaturan** | Buka menu Pengaturan. | Tampil info versi aplikasi (v0.1.2), commit hash pendek, sumber musik aktif (YouTube Music), opsi kualitas audio, dan tombol hapus riwayat. | [x] Terverifikasi Otomatis |
 | 4.3 | **Keamanan Teks (No XSS)** | Cari lagu dengan karakter khusus (misal: `<script>alert(1)</script>`). | Teks dirender sebagai teks biasa murni; tidak ada eksekusi HTML/JavaScript. | [x] Terverifikasi Otomatis |
 
 ---
@@ -66,11 +66,13 @@ Dokumen ini berisi panduan dan daftar periksa pengujian manual (*manual acceptan
 | 5.2 | **Navigasi Halaman Album** | Klik kartu album pada halaman artis atau hasil pencarian. | Halaman Album terbuka menampilkan cover album, nama album, tahun/durasi, tombol "Putar Semua", dan nomor trek lengkap. | [x] Terverifikasi Otomatis |
 | 5.3 | **Tombol "Putar Semua"** | Klik tombol "Putar Semua" pada halaman Artis atau Album. | Seluruh lagu dalam daftar dimasukkan ke antrean pemutar dan lagu pertama langsung diputar otomatis (`paused === false`). | [x] Terverifikasi Otomatis |
 | 5.4 | **Virtualisasi Daftar (VirtualizedTrackList)** | Buka daftar lagu panjang (> 50 trek) lalu gulir cepat (scroll). | Hanya item yang masuk viewport yang dirender di DOM (DOM recycling); pemakaian memori tetap rendah dan bebas lag. | [x] Terverifikasi Otomatis |
-| 5.5 | **Pintasan Keyboard Global** | Tekan Space (play/pause), ArrowLeft/Right (seek -/+5s), ArrowDown/Up (volume -/+5%), 'm' (mute/unmute). | Kontrol pemutar merespons seketika sesuai tombol keyboard yang ditekan. | [x] Terverifikasi Otomatis |
+| 5.5 | **Pintasan Keyboard Bebas Konflik Fokus** | Uji Space dan Panah saat fokus di input teks, tombol, slider, dan area umum. | Tidak ada aksi ganda; Space pada input mengetik spasi, pada tombol memicu klik native, pada slider mengatur nilai, pada body memicu play/pause. | [x] Terverifikasi Otomatis |
 | 5.6 | **Persistensi Database SQLite (node:sqlite)** | Putar lagu, ubah antrean, lalu muat ulang atau buka kembali aplikasi. | Pengaturan, antrean lagu, riwayat putar, dan posisi lagu terakhir tersimpan di database lokal SQLite (`musick.db`). | [x] Terverifikasi Otomatis |
-| 5.7 | **Siklus Tidur / Bangun (Sleep/Wake)** | Komputer memasuki mode suspend / sleep saat lagu memutar. | Melalui `powerMonitor`, aplikasi mendeteksi sinyal suspend dan menjeda pemutaran. Saat bangun (resume), lagu tetap dalam keadaan jeda (paused) tanpa distorsi/crash. | [x] Terverifikasi Otomatis |
-| 5.8 | **Perubahan Perangkat Audio (Device Change)** | Earphone dicabut saat pemutaran aktif. | Event `navigator.mediaDevices.ondevicechange` mendeteksi perubahan output audio dan otomatis menjeda pemutaran agar audio tidak bocor ke speaker internal. | [x] Terverifikasi Otomatis |
+| 5.7 | **Siklus Tidur / Bangun (Sleep/Wake Simulation)** | Simulasi sinyal suspend saat pemutaran aktif, lalu resume, lalu putar lanjut. | Audio jeda saat suspend, tetap jeda saat resume, dan saat ditekan play pemutaran berlanjut dari posisi detik terakhir (bukan 0) tanpa error. | [x] Terverifikasi Otomatis |
+| 5.8 | **Perubahan Perangkat Audio (Device Change)** | Earphone dicabut saat pemutaran aktif (hanya jeda bila output aktif hilang). | Logika deteksi hilangnya output audio aktif memicu jeda pemutaran agar tidak bocor ke speaker. | [ ] Belum diverifikasi di perangkat nyata |
 | 5.9 | **Smoke Test Binary Rilis Mandiri** | Jalankan `scripts/smoke_test_release.py` pada build hasil instalasi tanpa CDP / env var uji. | Membaca `%APPDATA%\Musick\runtime-status.json` dan membuktikan `isPackaged === true`, sumber aktif `ytmusic`, dan mock source tidak ada. | [x] Terverifikasi Otomatis |
+| 5.10 | **Pengerasan DB & Hapus Riwayat Permanen** | Tekan tombol "Hapus Riwayat Putar & Cari" di Pengaturan. | Seluruh baris riwayat putar dan riwayat pencarian dihapus permanen dari berkas `musick.db` (baris = 0). | [x] Terverifikasi Otomatis |
+| 5.11 | **Pencarian 1 Request Unfiltered (Tab Semua)** | Ketik kata kunci pada kolom Cari. | Mengirimkan tepat 1 permintaan tanpa filter (hasil campuran), menghemat 66,7% beban HTTP dan mematuhi throttle 250ms. | [x] Terverifikasi Otomatis |
 
 ---
 

@@ -13,45 +13,115 @@ export interface SavedPlaybackState {
 
 export class DatabaseService {
   private db: DatabaseSync;
+  private readonly dbPath: string;
 
   constructor(dbPath: string) {
+    this.dbPath = dbPath;
     const dir = path.dirname(dbPath);
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
+
+    // Buat cadangan otomatis (.bak) sebelum migrasi / inisialisasi jika berkas sudah ada
+    if (fs.existsSync(dbPath)) {
+      try {
+        fs.copyFileSync(dbPath, `${dbPath}.bak`);
+      } catch {
+        // Abaikan jika tidak dapat menyalin cadangan
+      }
+    }
+
     this.db = new DatabaseSync(dbPath);
-    this.initTables();
+    this.configurePragmasAndIntegrity();
+    this.runMigrations();
   }
 
-  private initTables(): void {
+  private configurePragmasAndIntegrity(): void {
+    // Aktifkan foreign_keys dan WAL journal mode
+    this.db.exec('PRAGMA foreign_keys = ON;');
+    this.db.exec('PRAGMA journal_mode = WAL;');
+
+    // Jalankan pemeriksaan integritas (PRAGMA integrity_check)
+    try {
+      const stmt = this.db.prepare('PRAGMA integrity_check');
+      const checkRow = stmt.get() as Record<string, unknown> | undefined;
+      const status = checkRow ? Object.values(checkRow)[0] : 'ok';
+      if (status !== 'ok') {
+        console.warn('[Database] Integritas database rusak, memulihkan dari cadangan terakhir...');
+        this.recoverFromBackup();
+      }
+    } catch {
+      this.recoverFromBackup();
+    }
+  }
+
+  private recoverFromBackup(): void {
+    try {
+      this.db.close();
+      const backupPath = `${this.dbPath}.bak`;
+      if (fs.existsSync(backupPath)) {
+        fs.copyFileSync(backupPath, this.dbPath);
+      } else {
+        fs.unlinkSync(this.dbPath);
+      }
+      this.db = new DatabaseSync(this.dbPath);
+      this.db.exec('PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL;');
+    } catch (err) {
+      console.error('[Database] Gagal memulihkan database dari cadangan:', err);
+    }
+  }
+
+  private runMigrations(): void {
+    // Tabel pelacak versi skema database (schema_meta)
     this.db.exec(`
-      CREATE TABLE IF NOT EXISTS settings (
-        key TEXT PRIMARY KEY,
-        value TEXT NOT NULL
-      );
-
-      CREATE TABLE IF NOT EXISTS playback_state (
-        id INTEGER PRIMARY KEY CHECK (id = 1),
-        track_json TEXT,
-        position_sec REAL DEFAULT 0,
-        paused INTEGER DEFAULT 1,
-        volume REAL DEFAULT 0.8,
-        is_muted INTEGER DEFAULT 0,
-        updated_at TEXT
-      );
-
-      CREATE TABLE IF NOT EXISTS queue (
-        queue_index INTEGER PRIMARY KEY,
-        track_json TEXT NOT NULL
-      );
-
-      CREATE TABLE IF NOT EXISTS history (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        track_id TEXT NOT NULL,
-        track_json TEXT NOT NULL,
-        played_at TEXT NOT NULL
+      CREATE TABLE IF NOT EXISTS schema_meta (
+        version INTEGER PRIMARY KEY,
+        migrated_at TEXT NOT NULL
       );
     `);
+
+    const versionRow = this.db.prepare('SELECT MAX(version) as ver FROM schema_meta').get() as { ver: number | null };
+    const currentVersion = versionRow?.ver ?? 0;
+
+    if (currentVersion < 1) {
+      this.db.exec(`
+        CREATE TABLE IF NOT EXISTS settings (
+          key TEXT PRIMARY KEY,
+          value TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS playback_state (
+          id INTEGER PRIMARY KEY CHECK (id = 1),
+          track_json TEXT,
+          position_sec REAL DEFAULT 0,
+          paused INTEGER DEFAULT 1,
+          volume REAL DEFAULT 0.8,
+          is_muted INTEGER DEFAULT 0,
+          updated_at TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS queue (
+          queue_index INTEGER PRIMARY KEY,
+          track_json TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS history (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          track_id TEXT NOT NULL,
+          track_json TEXT NOT NULL,
+          played_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS search_history (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          query TEXT NOT NULL,
+          searched_at TEXT NOT NULL
+        );
+      `);
+
+      const insertMeta = this.db.prepare('INSERT INTO schema_meta (version, migrated_at) VALUES (?, datetime(\'now\'))');
+      insertMeta.run(1);
+    }
   }
 
   getSetting(key: string): string | null {
@@ -135,6 +205,13 @@ export class DatabaseService {
       VALUES (?, ?, datetime('now'))
     `);
     stmt.run(track.id, JSON.stringify(track));
+
+    // Batas otomatis: pertahankan maksimal 500 riwayat putar terbaru
+    this.db.exec(`
+      DELETE FROM history WHERE id NOT IN (
+        SELECT id FROM history ORDER BY id DESC LIMIT 500
+      );
+    `);
   }
 
   getHistory(limit = 20): Track[] {
@@ -151,6 +228,47 @@ export class DatabaseService {
       }
     }
     return result;
+  }
+
+  addSearchHistory(query: string): void {
+    const trimmed = query.trim();
+    if (!trimmed) return;
+
+    const stmt = this.db.prepare(`
+      INSERT INTO search_history (query, searched_at)
+      VALUES (?, datetime('now'))
+    `);
+    stmt.run(trimmed);
+
+    // Batas otomatis: pertahankan maksimal 50 riwayat cari terbaru
+    this.db.exec(`
+      DELETE FROM search_history WHERE id NOT IN (
+        SELECT id FROM search_history ORDER BY id DESC LIMIT 50
+      );
+    `);
+  }
+
+  getSearchHistory(limit = 10): string[] {
+    const stmt = this.db.prepare(
+      'SELECT query FROM search_history ORDER BY id DESC LIMIT ?'
+    );
+    const rows = stmt.all(limit) as { query: string }[];
+    return rows.map((r) => r.query);
+  }
+
+  clearAllHistory(): { playbackCleared: number; searchCleared: number } {
+    const hRow = this.db.prepare('SELECT COUNT(*) as c FROM history').get() as { c: number };
+    const sRow = this.db.prepare('SELECT COUNT(*) as c FROM search_history').get() as { c: number };
+    const playbackCleared = hRow?.c || 0;
+    const searchCleared = sRow?.c || 0;
+
+    this.db.exec('DELETE FROM history; DELETE FROM search_history;');
+    return { playbackCleared, searchCleared };
+  }
+
+  getSchemaVersion(): number {
+    const row = this.db.prepare('SELECT MAX(version) as ver FROM schema_meta').get() as { ver: number | null };
+    return row?.ver ?? 0;
   }
 
   close(): void {
