@@ -197,10 +197,10 @@ async def run_e2e():
         # Skenario 2: Buka PlaylistPage, tambah trek -> verifikasi baris muncul di DOM tanpa reload
         # ========================================================
         print("\n--- Skenario 2: PlaylistPage real-time update saat tambah trek ---")
-        # Buat playlist baru via __testLibrary
+        # Buat playlist baru via musicApi
         pl_created = await cdp_eval(ws, """
             (async () => {
-                return await window.__testLibrary.createPlaylist('Playlist Reaktif E2E', 'Uji reaktivitas');
+                return await window.musicApi.dbCreatePlaylist('Playlist Reaktif E2E', 'Uji reaktivitas');
             })()
         """, req_id)
         req_id += 1
@@ -224,11 +224,11 @@ async def run_e2e():
         print(f"Judul PlaylistPage aktif: {pl_title}")
         assert pl_title == 'Playlist Reaktif E2E', f"Expected 'Playlist Reaktif E2E', got '{pl_title}'"
 
-        # Tambahkan track2 ke playlist
+        # Tambahkan track2 ke playlist via musicApi
         t_start2 = time.perf_counter()
         await cdp_eval(ws, f"""
             (async () => {{
-                await window.__testLibrary.addTrackToPlaylist({pl_id}, window.__testTrack2);
+                await window.musicApi.dbAddTrackToPlaylist({pl_id}, window.__testTrack2);
             }})()
         """, req_id)
         req_id += 1
@@ -361,7 +361,7 @@ async def run_e2e():
                     const badge = document.getElementById('badge-liked-count');
                     return {
                         rowCount: rows.length,
-                        playerHeart: playerLikeBtn ? playerLikeBtn.innerText : '',
+                        playerHeart: playerLikeBtn ? playerLikeBtn.innerText.trim() : '',
                         badgeCount: badge ? badge.innerText : '0'
                     };
                 })()
@@ -391,19 +391,19 @@ async def run_e2e():
             t = random.choice(liked_track_pool)
 
             if act == "like":
-                await cdp_eval(ws, f"window.__testLibrary.toggleLike({json.dumps(t)})", req_id)
+                await cdp_eval(ws, f"window.musicApi.dbToggleLikeTrack({json.dumps(t)})", req_id)
                 req_id += 1
             elif act == "create_pl":
-                res = await cdp_eval(ws, f"window.__testLibrary.createPlaylist('Random PL {i}', 'Auto')", req_id)
+                res = await cdp_eval(ws, f"window.musicApi.dbCreatePlaylist('Random PL {i}', 'Auto')", req_id)
                 req_id += 1
                 created_pl_ids.append(res["id"])
             elif act == "rename_pl" and created_pl_ids:
                 pid = random.choice(created_pl_ids)
-                await cdp_eval(ws, f"window.__testLibrary.renamePlaylist({pid}, 'Ganti Nama {i}')", req_id)
+                await cdp_eval(ws, f"window.musicApi.dbRenamePlaylist({pid}, 'Ganti Nama {i}')", req_id)
                 req_id += 1
             elif act == "add_to_pl" and created_pl_ids:
                 pid = random.choice(created_pl_ids)
-                await cdp_eval(ws, f"window.__testLibrary.addTrackToPlaylist({pid}, {json.dumps(t)})", req_id)
+                await cdp_eval(ws, f"window.musicApi.dbAddTrackToPlaylist({pid}, {json.dumps(t)})", req_id)
                 req_id += 1
             elif act == "remove_from_pl" and created_pl_ids:
                 pid = random.choice(created_pl_ids)
@@ -411,7 +411,7 @@ async def run_e2e():
                     (async () => {{
                         const tracks = await window.musicApi.dbGetPlaylistTracks({pid});
                         if (tracks.length > 0) {{
-                            await window.__testLibrary.removeTrackFromPlaylist({pid}, tracks[0].playlistTrackId || tracks[0].id);
+                            await window.musicApi.dbRemoveTrackFromPlaylist({pid}, tracks[0].playlistTrackId || tracks[0].id);
                         }}
                     }})()
                 """, req_id)

@@ -139,6 +139,7 @@ export const Sidebar: React.FC = () => {
               return (
                 <button
                   key={p.id}
+                  id={`playlist-item-${p.id}`}
                   onClick={() => navigateToPlaylist(p.id)}
                   style={{
                     display: 'flex',
